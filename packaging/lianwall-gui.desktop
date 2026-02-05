@@ -1,0 +1,15 @@
+[Desktop Entry]
+Name=Lianwall GUI
+Name[zh_CN]=Lianwall 壁纸管理器
+Comment=Wayland Dynamic Wallpaper Manager
+Comment[zh_CN]=Wayland 动态壁纸管理器
+GenericName=Wallpaper Manager
+GenericName[zh_CN]=壁纸管理器
+Exec=lianwall-gui
+Icon=lianwall
+Terminal=false
+Type=Application
+Categories=Utility;Settings;
+Keywords=wallpaper;wayland;video;background;
+StartupNotify=true
+StartupWMClass=lianwall-gui

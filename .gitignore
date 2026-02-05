@@ -1,0 +1,11 @@
+# 编译文件
+build/
+
+# AUR
+PKGBUILD
+
+# 本地脚本
+scripts/
+
+# bug列表
+BUGS.md
