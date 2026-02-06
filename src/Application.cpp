@@ -246,6 +246,43 @@ void Application::quit()
 }
 
 // ============================================================================
+// QML 可调用的 Daemon 命令
+// ============================================================================
+
+void Application::daemonNext()
+{
+    if (m_daemonClient->isConnected())
+        m_daemonClient->next();
+}
+
+void Application::daemonPrev()
+{
+    if (m_daemonClient->isConnected())
+        m_daemonClient->prev();
+}
+
+void Application::daemonToggleLock()
+{
+    if (m_daemonClient->isConnected()) {
+        auto path = m_daemonState->currentPath();
+        if (!path.isEmpty())
+            m_daemonClient->toggleLock(path);
+    }
+}
+
+void Application::daemonRescan()
+{
+    if (m_daemonClient->isConnected())
+        m_daemonClient->rescan();
+}
+
+void Application::daemonReloadConfig()
+{
+    if (m_daemonClient->isConnected())
+        m_daemonClient->reloadConfig();
+}
+
+// ============================================================================
 // 托盘
 // ============================================================================
 

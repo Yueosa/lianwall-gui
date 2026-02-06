@@ -65,8 +65,10 @@ qt_add_qml_module(lianwall-gui
         qml/main.qml
         qml/Theme.qml
         qml/components/NavBar.qml
+        qml/components/CountdownBar.qml
         qml/pages/PlaceholderPage.qml
         qml/pages/AboutPage.qml
+        qml/pages/DashboardPage.qml
     RESOURCES
         resources/resources.qrc
 )

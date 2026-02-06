@@ -70,11 +70,8 @@ ApplicationWindow {
             Layout.fillHeight: true
             currentIndex: root.currentPage
 
-            // 0 - Dashboard（占位）
-            Pages.PlaceholderPage {
-                pageName: "Dashboard"
-                pageIcon: "🏠"
-            }
+            // 0 - Dashboard
+            Pages.DashboardPage {}
 
             // 1 - Library（占位）
             Pages.PlaceholderPage {

@@ -44,6 +44,16 @@ public slots:
     /// 切换语言
     void switchLanguage(const QString &lang);
 
+    // ====================================================================
+    // QML 可调用的 Daemon 命令（转发到 DaemonClient）
+    // ====================================================================
+
+    Q_INVOKABLE void daemonNext();
+    Q_INVOKABLE void daemonPrev();
+    Q_INVOKABLE void daemonToggleLock();
+    Q_INVOKABLE void daemonRescan();
+    Q_INVOKABLE void daemonReloadConfig();
+
 signals:
     void aboutToQuit();
 
