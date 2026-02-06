@@ -1,55 +1,45 @@
-# Lianwall GUI
+<div align="center">
 
-<p align="center">
-  <img src="icon.svg" width="128" height="128" alt="Lianwall Logo">
-</p>
+# 🖼️ LianWall GUI
 
-<p align="center">
-  <b>Wayland 动态壁纸管理器的图形界面</b>
-</p>
+Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Platform-Wayland-blue?logo=wayland" alt="Wayland">
-  <img src="https://img.shields.io/badge/Qt-6.x-green?logo=qt" alt="Qt6">
-  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT">
-</p>
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
+[![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
 
-## 简介
+</div>
 
-Lianwall GUI 是 [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的图形界面前端，使用 Qt6/QML 开发。
+> **lianwalld 守护进程的图形化客户端** 🎯
+> - 通过 **Unix Socket** 直连 daemon，实时事件驱动
+> - **仪表盘** — 当前壁纸预览、快捷操作、倒计时、显存监控
+> - **壁纸库** — 网格浏览、搜索筛选、缩略图预览
+> - **设置** — 完整的 daemon 配置编辑（引擎参数、VRAM、日志等）
+> - **系统托盘** — 后台驻留，关闭窗口 ≠ 退出
+> - **中/英双语** — 运行时切换，即时生效
 
-### 功能特性
+**关于版本更新日志，请查看 [CHANGELOG](./CHANGELOG.md)**
 
-- 🎨 **壁纸预览** - 实时预览当前壁纸（支持视频播放）
-- 📚 **壁纸库** - 网格视图浏览所有壁纸，支持筛选和搜索
-- ⏰ **时间轴编辑器** - 可视化管理基于时间的壁纸切换
-- 🌻 **向日葵可视化** - 直观展示壁纸空间分布
-- 🖥️ **系统托盘** - 快速控制壁纸切换
-- 🌐 **多语言支持** - 中文/英文界面
-- 🚀 **开机自启** - systemd 用户服务支持
+---
 
-## 依赖
+## 📦 安装
 
-### 运行依赖
-
-- Qt 6.x (Core, Gui, Widgets, Quick, QuickControls2, Multimedia, Network)
-- ffmpeg (用于生成视频缩略图)
-- [lianwall](https://github.com/Yueosa/lianwall) 守护进程
-
-### 编译依赖
-
-- CMake >= 3.16
-- Qt6 开发包
-- C++17 编译器
-
-## 编译
+### Arch Linux (AUR)
 
 ```bash
-# 克隆仓库
+# 使用 AUR helper
+paru -S lianwall-gui
+# 或
+yay -S lianwall-gui
+```
+
+### 手动编译
+
+```bash
 git clone https://github.com/Yueosa/lianwall-gui.git
 cd lianwall-gui
 
-# 编译
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
@@ -57,69 +47,107 @@ cmake --build build
 sudo cmake --install build
 ```
 
-## Arch Linux
+### 依赖
 
-```bash
-cd packaging
-makepkg -si
-```
+#### 运行依赖
 
-## 使用
+| 包 | 说明 |
+|----|------|
+| Qt 6 (Core, Gui, Widgets, Quick, QuickControls2, Network) | GUI 框架 |
+| ffmpeg | 视频缩略图提取 |
+| [lianwall](https://github.com/Yueosa/lianwall) ≥ 5.0.0 | 守护进程 (lianwalld) |
+
+#### 编译依赖
+
+| 包 | 说明 |
+|----|------|
+| CMake ≥ 3.16 | 构建系统 |
+| Qt6 开发包 | 含 LinguistTools |
+| C++17 编译器 | GCC ≥ 9 / Clang ≥ 10 |
+
+---
+
+## 🚀 使用
 
 ```bash
 # 直接运行
-./build/lianwall-gui
-
-# 或者安装后
 lianwall-gui
+
+# 或从编译目录
+./build/lianwall-gui
 ```
 
-启动后：
-1. GUI 会自动连接到 lianwall 守护进程
-2. 如果守护进程未运行，可以通过托盘菜单启动
-3. 主界面提供 6 个页面：首页、库、时间轴、状态、设置、关于
+启动后 GUI 会自动连接 `lianwalld` 守护进程。如果 daemon 未运行，会自动查找并拉起（搜索顺序：`/usr/bin/lianwalld` → `~/.local/bin/lianwalld` → 同目录）。
 
-## 配置
+---
 
-GUI 应用设置存储在 `~/.config/lianwall-gui/settings.ini`：
+## 🏠 界面
+
+| 页面 | 功能 |
+|------|------|
+| **🏠 仪表盘** | 当前壁纸预览 + 状态信息 + 快捷操作 + 倒计时进度条 + 显存监控 |
+| **📚 壁纸库** | 网格视图浏览壁纸，搜索筛选（全部/已锁定/未锁定），点击查看详情 |
+| **⚙️ 设置** | 路径与模式、动态壁纸引擎(mpvpaper)、静态壁纸引擎(swww)、显存监控(VRAM)、守护进程、界面设置 |
+| **ℹ️ 关于** | 版本信息、源代码链接、主题色说明 |
+
+---
+
+## 🏗️ 架构
+
+```
+lianwall-gui (Qt6/QML)
+    │
+    ├── DaemonClient ──── Unix Socket ──── lianwalld (Rust)
+    │     (QLocalSocket)    JSON V2         (/tmp/lianwall.sock)
+    │
+    ├── DaemonState ────── 事件订阅 ────── WallpaperChanged
+    │                                       ConfigChanged
+    │                                       TimeInfo
+    │
+    ├── ConfigManager ──── GetConfig/SetConfig
+    │     (Q_PROPERTY)      + QSettings (本地 GUI 设置)
+    │
+    └── WallpaperListModel + ThumbnailProvider
+          (QAbstractListModel)  (ffmpeg + 磁盘缓存)
+```
+
+---
+
+## ⚙️ 配置
+
+### Daemon 配置
+
+通过设置页或 `lianwall config` 命令管理，存储在 `~/.config/lianwall/config.toml`。
+
+### GUI 本地设置
+
+存储在 QSettings 默认位置：
 
 | 设置 | 说明 | 默认值 |
 |------|------|--------|
-| `exitBehavior` | 退出行为 (ask/minimize/quit/shutdown) | ask |
-| `language` | 界面语言 (en/zh_CN) | 系统语言 |
-| `autostartEnabled` | 是否开机自启 | false |
+| `app/theme` | 界面主题 (`lian` / `lian-dark`) | `lian` |
+| `app/language` | 界面语言 (`zh_CN` / `en`) | `zh_CN` |
 
-lianwall 配置通过 CLI 命令管理，存储在 `~/.config/lianwall/config.toml`。
+---
 
-## 开机自启
+## 🎨 主题色
 
-在设置页面启用"开机自启"选项，会创建 systemd 用户服务：
+主题色取自跨性别骄傲旗配色，纯粹因为作者喜欢这些颜色：
 
-```
-~/.config/systemd/user/lianwall-gui.service
-```
+| 色彩 | 色值 | 用途 |
+|------|------|------|
+| 🔵 Blue | `#5BCEFA` | 强调色 — 按钮、链接、高亮 |
+| 🩷 Pink | `#F5A9B8` | 主色 — 重要元素、选中状态 |
+| ⚪ White | `#FFFFFF` | 亮面 — 反差、高亮 |
 
-手动管理：
+---
 
-```bash
-# 启用
-systemctl --user enable lianwall-gui.service
+## 📄 许可证
 
-# 启动
-systemctl --user start lianwall-gui.service
+LianWall License — 详见 [LICENSE](LICENSE) 文件
 
-# 查看状态
-systemctl --user status lianwall-gui.service
-```
+自由使用、修改、分发，但未经作者同意不得用于商业盈利。
 
-## 截图
+## 👤 作者
 
-（待添加）
-
-## 许可证
-
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
-## 作者
-
-Lian (Yueosa)
+**Lian** ([Yueosa](https://github.com/Yueosa))
