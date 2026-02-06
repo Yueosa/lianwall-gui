@@ -1,126 +1,81 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Window
 import LianwallGui 1.0
+import "." as App
 
 ApplicationWindow {
     id: root
-    width: 1000
-    height: 700
-    minimumWidth: 800
-    minimumHeight: 600
-    visible: false  // 初始隐藏，托盘控制显示
+    width: 800
+    height: 600
+    minimumWidth: 600
+    minimumHeight: 400
+    visible: true
     title: qsTr("LianWall")
+    
+    color: App.Theme.background
 
-    // 当前页面索引
-    property int currentPage: 0
-
-    // 状态模型
-    StatusModel {
-        id: statusModel
-        Component.onCompleted: {
-            setClient(Client)
-            refresh()
+    // 初始化主题
+    Component.onCompleted: {
+        App.Theme.current = ConfigManager.theme
+    }
+    
+    // 监听主题变化
+    Connections {
+        target: ConfigManager
+        function onThemeChanged(newTheme) {
+            App.Theme.current = newTheme
         }
     }
 
-    // 壁纸模型
-    WallpaperModel {
-        id: wallpaperModel
-        Component.onCompleted: {
-            setClient(Client)
-            setThumbnailProvider(ThumbnailCache)
-        }
-    }
-
-    // 时间轴模型
-    TimelineModel {
-        id: timelineModel
-        Component.onCompleted: {
-            setClient(Client)
-        }
-    }
-
-    // 定时刷新状态
-    Timer {
-        interval: 5000
-        running: true
-        repeat: true
-        onTriggered: statusModel.refresh()
-    }
-
-    // 窗口关闭事件
-    onClosing: function(close) {
-        let behavior = ConfigManager.exitBehavior()
-        
-        if (behavior === "minimize") {
-            close.accepted = false
-            root.hide()
-        } else if (behavior === "shutdown") {
-            ProcessManager.gracefulShutdown()
-        } else {
-            // "ask" - 弹窗
-            close.accepted = false
-            exitDialog.open()
-        }
-    }
-
-    // 主布局
+    // 占位内容
     ColumnLayout {
         anchors.fill: parent
-        spacing: 0
-
-        // 导航栏
-        NavBar {
-            id: navBar
-            Layout.fillWidth: true
-            currentIndex: root.currentPage
-            onPageSelected: function(index) {
-                root.currentPage = index
+        anchors.margins: 20
+        spacing: 16
+        
+        // 标题
+        Text {
+            text: "LianWall GUI"
+            font.pixelSize: 28
+            font.bold: true
+            color: App.Theme.text
+        }
+        
+        Text {
+            text: qsTr("Clean slate - ready for your ideas")
+            font.pixelSize: 16
+            color: App.Theme.textSecondary
+        }
+        
+        // 主题切换测试
+        RowLayout {
+            spacing: 12
+            
+            Text {
+                text: qsTr("Theme:")
+                color: App.Theme.text
+            }
+            
+            Button {
+                text: "Lian (Light)"
+                onClicked: ConfigManager.setTheme("lian")
+            }
+            
+            Button {
+                text: "Lian-Dark"
+                onClicked: ConfigManager.setTheme("lian-dark")
             }
         }
-
-        // 页面栈
-        StackLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            currentIndex: root.currentPage
-
-            HomePage {
-                statusModel: statusModel
-            }
-
-            LibraryPage {
-                wallpaperModel: wallpaperModel
-            }
-
-            TimelinePage {
-                timelineModel: timelineModel
-            }
-
-            StatusPage {
-                wallpaperModel: wallpaperModel
-            }
-
-            SettingsPage {}
-
-            AboutPage {}
+        
+        // 填充
+        Item { Layout.fillHeight: true }
+        
+        // 版本信息
+        Text {
+            text: "v" + AppVersion + " by " + AppAuthor
+            font.pixelSize: 12
+            color: App.Theme.textSecondary
         }
-    }
-
-    // 退出确认对话框
-    ExitDialog {
-        id: exitDialog
-        onMinimizeRequested: root.hide()
-        onShutdownRequested: ProcessManager.gracefulShutdown()
-        onQuitRequested: Qt.quit()
-    }
-
-    // 显示窗口的函数
-    function show() {
-        root.visible = true
-        root.raise()
-        root.requestActivate()
     }
 }

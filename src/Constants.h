@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QPair>
 #include <QDir>
 #include <QCoreApplication>
 
@@ -10,17 +11,17 @@ namespace LianwallGui {
 // 版本信息
 // ============================================================================
 constexpr const char* APP_NAME = "LianWall";
-constexpr const char* APP_VERSION = "4.0.0";
+constexpr const char* APP_VERSION = "5.0.0";
 constexpr const char* APP_AUTHOR = "Lian";
 constexpr const char* APP_GITHUB = "https://github.com/Yueosa/lianwall";
 constexpr const char* APP_DESCRIPTION = "Selects wallpapers using the golden angle algorithm, sprinkled with Lian's magic";
 
 // ============================================================================
-// Socket 协议
+// Socket 协议 (v2: 行分隔 JSON)
 // ============================================================================
 namespace Protocol {
     constexpr const char* DEFAULT_SOCKET_PATH = "/tmp/lianwall.sock";
-    constexpr quint32 PROTOCOL_VERSION = 1;
+    constexpr quint32 PROTOCOL_VERSION = 2;
     constexpr qint64 MAX_MESSAGE_SIZE = 1024 * 1024;  // 1 MB
     constexpr int CONNECT_TIMEOUT_MS = 1000;
     constexpr int READ_TIMEOUT_MS = 5000;
@@ -54,7 +55,7 @@ namespace Paths {
         return QDir::homePath() + "/.config/systemd/user/lianwall-gui.service";
     }
     
-    // 内嵌的 lianwall 二进制文件路径
+    // lianwall CLI 二进制文件路径
     inline QString embeddedLianwall() {
         // 优先查找与可执行文件同目录的 lianwall
         QString appDir = QCoreApplication::applicationDirPath();
@@ -72,14 +73,82 @@ namespace Paths {
         // 最后回退到系统 PATH
         return "lianwall";
     }
+    
+    // lianwalld daemon 二进制文件路径
+    inline QString embeddedLianwalld() {
+        // 优先查找与可执行文件同目录的 lianwalld
+        QString appDir = QCoreApplication::applicationDirPath();
+        QString embedded = appDir + "/lianwalld";
+        if (QFile::exists(embedded)) {
+            return embedded;
+        }
+        
+        // 然后查找安装目录
+        QString installed = "/usr/lib/lianwall-gui/lianwalld";
+        if (QFile::exists(installed)) {
+            return installed;
+        }
+        
+        // 最后回退到系统 PATH
+        return "lianwalld";
+    }
 }
 
 // ============================================================================
-// 缩略图
+// 缩略图 - 多分辨率支持
 // ============================================================================
 namespace Thumbnail {
-    constexpr int WIDTH = 320;
-    constexpr int HEIGHT = 180;
+    // 分辨率档位
+    enum class Quality {
+        High,    // 1920x1080 - 大屏/4K 显示器预览
+        Medium,  // 1280x720  - 常规显示器预览
+        Low,     // 640x360   - 省流模式预览
+        Tiny     // 320x180   - Library/Timeline/Status 列表
+    };
+    
+    // 获取分辨率尺寸
+    inline QPair<int, int> getSize(Quality q) {
+        switch (q) {
+            case Quality::High:   return {1920, 1080};
+            case Quality::Medium: return {1280, 720};
+            case Quality::Low:    return {640, 360};
+            case Quality::Tiny:   return {320, 180};
+            default:              return {1280, 720};
+        }
+    }
+    
+    // 获取分辨率后缀
+    inline QString getSuffix(Quality q) {
+        switch (q) {
+            case Quality::High:   return "_1080p";
+            case Quality::Medium: return "_720p";
+            case Quality::Low:    return "_360p";
+            case Quality::Tiny:   return "_180p";
+            default:              return "_720p";
+        }
+    }
+    
+    // 从字符串解析
+    inline Quality fromString(const QString &s) {
+        if (s == "high" || s == "1080p") return Quality::High;
+        if (s == "medium" || s == "720p") return Quality::Medium;
+        if (s == "low" || s == "360p") return Quality::Low;
+        if (s == "tiny" || s == "180p") return Quality::Tiny;
+        return Quality::Medium;
+    }
+    
+    // 转为字符串
+    inline QString toString(Quality q) {
+        switch (q) {
+            case Quality::High:   return "high";
+            case Quality::Medium: return "medium";
+            case Quality::Low:    return "low";
+            case Quality::Tiny:   return "tiny";
+            default:              return "medium";
+        }
+    }
+    
+    constexpr int SEEK_SECONDS = 5;       // 从第 5 秒截取
     constexpr const char* FORMAT = "jpg";
     constexpr int QUALITY = 85;
 }
@@ -88,9 +157,10 @@ namespace Thumbnail {
 // UI 常量
 // ============================================================================
 namespace UI {
-    constexpr int STATUS_POLL_INTERVAL_MS = 5000;  // 状态轮询间隔
     constexpr int RECONNECT_DELAY_MS = 1000;       // 重连延迟
     constexpr int MAX_HISTORY_SIZE = 100;          // 历史栈最大大小
+    constexpr int COUNTDOWN_WARNING_SECS = 60;     // 倒计时警告阈值（秒）
+    constexpr int DAEMON_TIMEOUT_SECS = 5;         // daemon 超时判定（秒）
 }
 
 }  // namespace LianwallGui

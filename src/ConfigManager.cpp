@@ -7,7 +7,10 @@
 #include <QUrl>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QClipboard>
 #include <QMessageBox>
 #include <QDebug>
 
@@ -78,6 +81,61 @@ void ConfigManager::openCacheDir() {
     QDesktopServices::openUrl(QUrl::fromLocalFile(Paths::cacheDir()));
 }
 
+QString ConfigManager::wallpaperDir() {
+    // 从配置获取壁纸目录
+    QString dir = get("video_dir");
+    if (dir.isEmpty()) {
+        // 默认目录
+        dir = QDir::homePath() + "/Videos/Wallpapers";
+    }
+    // 展开 ~
+    if (dir.startsWith("~/")) {
+        dir = QDir::homePath() + dir.mid(1);
+    }
+    return dir;
+}
+
+QString ConfigManager::addWallpaper(const QString &sourcePath) {
+    QFileInfo sourceInfo(sourcePath);
+    if (!sourceInfo.exists()) {
+        qWarning() << "[ConfigManager] Source file does not exist:" << sourcePath;
+        return QString();
+    }
+    
+    QString destDir = wallpaperDir();
+    QDir().mkpath(destDir);  // 确保目录存在
+    
+    QString destPath = destDir + "/" + sourceInfo.fileName();
+    
+    // 如果目标已存在，添加数字后缀
+    if (QFile::exists(destPath)) {
+        QString baseName = sourceInfo.completeBaseName();
+        QString suffix = sourceInfo.suffix();
+        int counter = 1;
+        do {
+            destPath = QString("%1/%2_%3.%4").arg(destDir, baseName).arg(counter++).arg(suffix);
+        } while (QFile::exists(destPath));
+    }
+    
+    if (QFile::copy(sourcePath, destPath)) {
+        qDebug() << "[ConfigManager] Copied wallpaper to:" << destPath;
+        return destPath;
+    } else {
+        qWarning() << "[ConfigManager] Failed to copy wallpaper:" << sourcePath << "->" << destPath;
+        return QString();
+    }
+}
+
+void ConfigManager::openInFileManager(const QString &filePath) {
+    QFileInfo info(filePath);
+    QString dirPath = info.isDir() ? filePath : info.absolutePath();
+    QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath));
+}
+
+void ConfigManager::copyToClipboard(const QString &text) {
+    QGuiApplication::clipboard()->setText(text);
+}
+
 // ============================================================================
 // 应用设置 (QSettings)
 // ============================================================================
@@ -106,7 +164,7 @@ void ConfigManager::setLanguage(const QString &lang) {
 
 QString ConfigManager::theme() {
     QSettings settings;
-    return settings.value("app/theme", "system").toString();
+    return settings.value("app/theme", "lian").toString();
 }
 
 void ConfigManager::setTheme(const QString &theme) {

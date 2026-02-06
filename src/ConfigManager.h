@@ -40,6 +40,20 @@ public:
     /// 在文件管理器中打开缓存目录
     Q_INVOKABLE void openCacheDir();
 
+    /// 获取壁纸目录路径
+    Q_INVOKABLE QString wallpaperDir();
+
+    /// 添加壁纸（复制文件到壁纸目录）
+    /// @param sourcePath 源文件路径
+    /// @return 成功返回目标路径，失败返回空字符串
+    Q_INVOKABLE QString addWallpaper(const QString &sourcePath);
+
+    /// 在文件管理器中打开指定文件所在目录
+    Q_INVOKABLE void openInFileManager(const QString &filePath);
+
+    /// 复制文本到剪贴板
+    Q_INVOKABLE void copyToClipboard(const QString &text);
+
     // === 应用设置 (存储在 QSettings) ===
 
     /// 退出行为: "ask", "minimize", "shutdown"
