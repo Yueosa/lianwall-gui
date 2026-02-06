@@ -73,10 +73,9 @@ ApplicationWindow {
             // 0 - Dashboard
             Pages.DashboardPage {}
 
-            // 1 - Library（占位）
-            Pages.PlaceholderPage {
-                pageName: "Library"
-                pageIcon: "📚"
+            // 1 - Library
+            Pages.LibraryPage {
+                activated: root.currentPage === 1
             }
 
             // 2 - Settings（占位）

@@ -18,6 +18,8 @@
 class DaemonClient;
 class DaemonState;
 class ConfigManager;
+class WallpaperListModel;
+class WallpaperFilterModel;
 
 class Application : public QObject {
     Q_OBJECT
@@ -74,6 +76,10 @@ private:
     DaemonClient *m_daemonClient;
     DaemonState  *m_daemonState;
     ConfigManager *m_configManager;
+
+    // 壁纸模型
+    WallpaperListModel  *m_wallpaperModel;
+    WallpaperFilterModel *m_wallpaperFilterModel;
 
     // 系统托盘
     QSystemTrayIcon *m_trayIcon;

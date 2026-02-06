@@ -33,6 +33,8 @@ set(SOURCES
     src/ConfigManager.cpp
     src/DaemonClient.cpp
     src/DaemonState.cpp
+    src/WallpaperListModel.cpp
+    src/ThumbnailProvider.cpp
 )
 
 set(HEADERS
@@ -42,6 +44,8 @@ set(HEADERS
     src/DaemonTypes.h
     src/DaemonClient.h
     src/DaemonState.h
+    src/WallpaperListModel.h
+    src/ThumbnailProvider.h
 )
 
 # ============================================================================
@@ -69,6 +73,8 @@ qt_add_qml_module(lianwall-gui
         qml/pages/PlaceholderPage.qml
         qml/pages/AboutPage.qml
         qml/pages/DashboardPage.qml
+        qml/pages/LibraryPage.qml
+        qml/dialogs/WallpaperDetailDialog.qml
     RESOURCES
         resources/resources.qrc
 )

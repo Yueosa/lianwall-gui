@@ -3,6 +3,8 @@
 #include "Constants.h"
 #include "DaemonClient.h"
 #include "DaemonState.h"
+#include "WallpaperListModel.h"
+#include "ThumbnailProvider.h"
 
 #include <QQmlContext>
 #include <QIcon>
@@ -58,6 +60,11 @@ void Application::initComponents()
     // 通信层
     m_daemonClient = new DaemonClient(this);
     m_daemonState  = new DaemonState(m_daemonClient, this);
+
+    // 壁纸模型
+    m_wallpaperModel = new WallpaperListModel(m_daemonClient, this);
+    m_wallpaperFilterModel = new WallpaperFilterModel(this);
+    m_wallpaperFilterModel->setSourceModel(m_wallpaperModel);
 
     // 配置管理（暂保留旧 ConfigManager，Phase 6 重写）
     m_configManager = new ConfigManager(this);
@@ -147,6 +154,13 @@ void Application::registerQmlTypes()
 
     // DaemonState 暴露给 QML
     ctx->setContextProperty("DaemonState", m_daemonState);
+
+    // 壁纸模型暴露给 QML
+    ctx->setContextProperty("WallpaperModel", m_wallpaperModel);
+    ctx->setContextProperty("WallpaperFilterModel", m_wallpaperFilterModel);
+
+    // 注册缩略图提供器
+    m_engine->addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider());
 
     // Application 自身暴露给 QML（窗口控制）
     ctx->setContextProperty("App", this);

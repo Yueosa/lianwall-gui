@@ -60,12 +60,10 @@ Item {
                             Image {
                                 id: previewImage
                                 anchors.fill: parent
-                                // 图片模式直接加载原图，视频模式使用缩略图（Phase 5 ThumbnailProvider）
                                 source: {
                                     if (!DaemonState.currentPath) return ""
                                     if (dashRoot.isVideo) {
-                                        // 视频暂用占位，Phase 5 替换为 image://thumbnail/
-                                        return ""
+                                        return "image://thumbnail/" + encodeURIComponent(DaemonState.currentPath)
                                     }
                                     return "file://" + DaemonState.currentPath
                                 }
