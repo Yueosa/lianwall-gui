@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lianwall-gui VERSION 5.0.0 LANGUAGES CXX)
+project(lianwall-gui VERSION 5.1.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +20,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Quick
     QuickControls2
+    Network
     LinguistTools
 )
 
@@ -30,12 +31,17 @@ set(SOURCES
     src/main.cpp
     src/Application.cpp
     src/ConfigManager.cpp
+    src/DaemonClient.cpp
+    src/DaemonState.cpp
 )
 
 set(HEADERS
     src/Application.h
     src/ConfigManager.h
     src/Constants.h
+    src/DaemonTypes.h
+    src/DaemonClient.h
+    src/DaemonState.h
 )
 
 # ============================================================================
@@ -68,6 +74,7 @@ target_link_libraries(lianwall-gui PRIVATE
     Qt6::Widgets
     Qt6::Quick
     Qt6::QuickControls2
+    Qt6::Network
 )
 
 # ============================================================================

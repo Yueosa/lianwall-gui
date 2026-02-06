@@ -75,7 +75,8 @@ void Application::registerQmlTypes() {
     // 暴露常量
     m_engine->rootContext()->setContextProperty("AppVersion", APP_VERSION);
     m_engine->rootContext()->setContextProperty("AppAuthor", APP_AUTHOR);
-    m_engine->rootContext()->setContextProperty("AppGitHub", APP_GITHUB);
+    m_engine->rootContext()->setContextProperty("AppGitHubGui", APP_GITHUB_GUI);
+    m_engine->rootContext()->setContextProperty("AppGitHubDaemon", APP_GITHUB_DAEMON);
     m_engine->rootContext()->setContextProperty("AppDescription", APP_DESCRIPTION);
 }
 
