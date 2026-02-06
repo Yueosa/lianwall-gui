@@ -114,6 +114,6 @@ install(FILES packaging/lianwall-gui.desktop
     DESTINATION share/applications
 )
 
-install(FILES resources/icons/lianwall.svg
+install(FILES resources/icons/lianwall.png
     DESTINATION share/icons/hicolor/scalable/apps
 )

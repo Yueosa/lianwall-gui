@@ -35,7 +35,7 @@ Application::Application(int &argc, char **argv)
     m_app->setApplicationVersion(APP_VERSION);
     m_app->setOrganizationName(APP_AUTHOR);
     m_app->setOrganizationDomain("github.com/Yueosa");
-    m_app->setWindowIcon(QIcon(QStringLiteral(":/icons/lianwall.svg")));
+    m_app->setWindowIcon(QIcon(QStringLiteral(":/icons/lianwall.png")));
 
     // 关闭窗口 ≠ 退出进程（托盘驻留）
     m_app->setQuitOnLastWindowClosed(false);
@@ -108,7 +108,7 @@ void Application::initSystemTray()
 
     // --- 托盘图标 ---
     m_trayIcon = new QSystemTrayIcon(this);
-    m_trayIcon->setIcon(QIcon(QStringLiteral(":/icons/lianwall.svg")));
+    m_trayIcon->setIcon(QIcon(QStringLiteral(":/icons/lianwall.png")));
     m_trayIcon->setToolTip(QStringLiteral("%1 %2").arg(APP_NAME, APP_VERSION));
     m_trayIcon->setContextMenu(m_trayMenu);
 

@@ -26,7 +26,7 @@ Item {
                 // Logo
                 Image {
                     Layout.alignment: Qt.AlignHCenter
-                    source: "qrc:/icons/lianwall.svg"
+                    source: "qrc:/icons/lianwall.png"
                     sourceSize: Qt.size(96, 96)
                     fillMode: Image.PreserveAspectFit
                 }
