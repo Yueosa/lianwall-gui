@@ -3,6 +3,7 @@
 #include <QString>
 #include <QPair>
 #include <QDir>
+#include <QFile>
 #include <QCoreApplication>
 
 namespace LianwallGui {
@@ -56,42 +57,30 @@ namespace Paths {
         return QDir::homePath() + "/.config/systemd/user/lianwall-gui.service";
     }
     
-    // lianwall CLI 二进制文件路径
-    inline QString embeddedLianwall() {
-        // 优先查找与可执行文件同目录的 lianwall
-        QString appDir = QCoreApplication::applicationDirPath();
-        QString embedded = appDir + "/lianwall";
-        if (QFile::exists(embedded)) {
-            return embedded;
-        }
-        
-        // 然后查找安装目录
-        QString installed = "/usr/lib/lianwall-gui/lianwall";
-        if (QFile::exists(installed)) {
-            return installed;
-        }
-        
-        // 最后回退到系统 PATH
-        return "lianwall";
-    }
-    
-    // lianwalld daemon 二进制文件路径
-    inline QString embeddedLianwalld() {
-        // 优先查找与可执行文件同目录的 lianwalld
-        QString appDir = QCoreApplication::applicationDirPath();
-        QString embedded = appDir + "/lianwalld";
-        if (QFile::exists(embedded)) {
-            return embedded;
-        }
-        
-        // 然后查找安装目录
-        QString installed = "/usr/lib/lianwall-gui/lianwalld";
-        if (QFile::exists(installed)) {
-            return installed;
-        }
-        
-        // 最后回退到系统 PATH
-        return "lianwalld";
+    /// 查找 lianwalld 可执行文件
+    /// 搜索顺序：
+    ///   1. /usr/bin/lianwalld          — AUR / pacman 系统安装
+    ///   2. ~/.local/bin/lianwalld      — 用户本地安装
+    ///   3. <自身所在目录>/lianwalld     — 开发 / 便携场景
+    /// 若均未找到，回退到裸名 "lianwalld"（依赖 PATH）
+    inline QString findLianwalld() {
+        // 1. 系统路径
+        const QString sys = QStringLiteral("/usr/bin/lianwalld");
+        if (QFile::exists(sys))
+            return sys;
+
+        // 2. 用户本地路径
+        const QString local = QDir::homePath() + QStringLiteral("/.local/bin/lianwalld");
+        if (QFile::exists(local))
+            return local;
+
+        // 3. 与 GUI 同目录
+        const QString sibling = QCoreApplication::applicationDirPath() + QStringLiteral("/lianwalld");
+        if (QFile::exists(sibling))
+            return sibling;
+
+        // 4. 回退裸名，交给 PATH 解析
+        return QStringLiteral("lianwalld");
     }
 }
 

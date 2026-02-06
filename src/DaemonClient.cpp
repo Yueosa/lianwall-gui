@@ -1,7 +1,9 @@
 #include "DaemonClient.h"
+#include "Constants.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QProcess>
 #include <QDebug>
 
 // ============================================================================
@@ -134,6 +136,11 @@ void DaemonClient::onSocketError(QLocalSocket::LocalSocketError error)
     QString msg = m_socket->errorString();
     qDebug() << "[DaemonClient] Socket error:" << msg;
     emit errorOccurred(msg);
+
+    // 首次连接失败时尝试自动拉起 daemon
+    if (!m_daemonStartAttempted && m_autoReconnect) {
+        tryStartDaemon();
+    }
 }
 
 void DaemonClient::tryReconnect()
@@ -213,6 +220,23 @@ void DaemonClient::processLine(const QByteArray &line)
 void DaemonClient::resetBackoff()
 {
     m_reconnectDelay = kMinReconnectDelay;
+}
+
+void DaemonClient::tryStartDaemon()
+{
+    m_daemonStartAttempted = true;
+
+    using namespace LianwallGui;
+    const QString exe = Paths::findLianwalld();
+    qDebug() << "[DaemonClient] Daemon not running, attempting to start:" << exe;
+
+    // 以分离进程启动 daemon（daemon 自身会 daemonize）
+    bool ok = QProcess::startDetached(exe, {});
+    if (ok) {
+        qDebug() << "[DaemonClient] lianwalld launched, waiting for socket...";
+    } else {
+        qWarning() << "[DaemonClient] Failed to start lianwalld at" << exe;
+    }
 }
 
 // ============================================================================

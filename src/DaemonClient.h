@@ -109,6 +109,9 @@ private:
     /// 重置重连退避
     void resetBackoff();
 
+    /// 尝试启动 daemon 进程（仅一次）
+    void tryStartDaemon();
+
     QLocalSocket *m_socket = nullptr;
     QString m_socketPath;
     QByteArray m_readBuffer;
@@ -119,6 +122,9 @@ private:
     static constexpr int kMinReconnectDelay  = 1000;   // 1s
     static constexpr int kMaxReconnectDelay  = 30000;  // 30s
     bool m_autoReconnect = false;
+
+    // daemon 自动拉起
+    bool m_daemonStartAttempted = false;  // 每次生命周期只尝试启动一次
 
     // 请求-响应匹配：FIFO 队列
     // daemon 按顺序处理请求，所以响应也是有序的
