@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import LianwallGui
 import "." as App
 import "components" as Components
 import "pages" as Pages
