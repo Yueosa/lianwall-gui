@@ -198,7 +198,7 @@ Item {
                             Layout.fillWidth: true
                             label: qsTr("mpvpaper 参数")
                             tags: ConfigManager.mpvpaperArgs
-                            onTagsChanged: function(newTags) {
+                            onTagsEdited: function(newTags) {
                                 ConfigManager.setMpvpaperArgs(newTags)
                             }
                         }
@@ -208,7 +208,7 @@ Item {
                             Layout.fillWidth: true
                             label: qsTr("mpv 参数")
                             tags: ConfigManager.mpvArgs
-                            onTagsChanged: function(newTags) {
+                            onTagsEdited: function(newTags) {
                                 ConfigManager.setMpvArgs(newTags)
                             }
                         }
@@ -263,7 +263,7 @@ Item {
                             Layout.fillWidth: true
                             label: qsTr("swww 参数")
                             tags: ConfigManager.swwwArgs
-                            onTagsChanged: function(newTags) {
+                            onTagsEdited: function(newTags) {
                                 ConfigManager.setSwwwArgs(newTags)
                             }
                         }

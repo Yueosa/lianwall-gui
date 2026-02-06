@@ -11,7 +11,7 @@ Item {
 
     property string label: ""
     property var tags: []         // QStringList 绑定
-    signal tagsChanged(var newTags)
+    signal tagsEdited(var newTags)
 
     implicitHeight: tagCol.height
 
@@ -75,7 +75,7 @@ Item {
                                 onClicked: {
                                     var newTags = tagRoot.tags.slice()
                                     newTags.splice(index, 1)
-                                    tagRoot.tagsChanged(newTags)
+                                    tagRoot.tagsEdited(newTags)
                                 }
                             }
                         }
@@ -154,6 +154,6 @@ Item {
         var newTags = tagRoot.tags.slice()
         newTags.push(text)
         addInput.text = ""
-        tagRoot.tagsChanged(newTags)
+        tagRoot.tagsEdited(newTags)
     }
 }
