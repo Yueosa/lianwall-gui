@@ -8,6 +8,7 @@
 
 #include <QQmlContext>
 #include <QIcon>
+#include <QDir>
 #include <QDebug>
 #include <QAction>
 #include <QWindow>
@@ -66,8 +67,8 @@ void Application::initComponents()
     m_wallpaperFilterModel = new WallpaperFilterModel(this);
     m_wallpaperFilterModel->setSourceModel(m_wallpaperModel);
 
-    // 配置管理（暂保留旧 ConfigManager，Phase 6 重写）
-    m_configManager = new ConfigManager(this);
+    // 配置管理（通过 DaemonClient 读写 daemon 配置）
+    m_configManager = new ConfigManager(m_daemonClient, this);
 
     // 启动连接
     m_daemonClient->connectToDaemon();
@@ -171,6 +172,7 @@ void Application::registerQmlTypes()
     ctx->setContextProperty("AppGitHubGui",    APP_GITHUB_GUI);
     ctx->setContextProperty("AppGitHubDaemon", APP_GITHUB_DAEMON);
     ctx->setContextProperty("AppDescription",  APP_DESCRIPTION);
+    ctx->setContextProperty("HomeDir", QDir::homePath());
 }
 
 // ============================================================================

@@ -78,11 +78,8 @@ ApplicationWindow {
                 activated: root.currentPage === 1
             }
 
-            // 2 - Settings（占位）
-            Pages.PlaceholderPage {
-                pageName: "Settings"
-                pageIcon: "⚙️"
-            }
+            // 2 - Settings
+            Pages.SettingsPage {}
 
             // 3 - About
             Pages.AboutPage {}
