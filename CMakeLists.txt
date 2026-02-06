@@ -64,6 +64,9 @@ qt_add_qml_module(lianwall-gui
     QML_FILES
         qml/main.qml
         qml/Theme.qml
+        qml/components/NavBar.qml
+        qml/pages/PlaceholderPage.qml
+        qml/pages/AboutPage.qml
     RESOURCES
         resources/resources.qrc
 )
