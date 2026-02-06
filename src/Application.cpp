@@ -148,13 +148,11 @@ void Application::switchLanguage(const QString &lang)
 
 void Application::registerQmlTypes()
 {
-    // 注册旧的 ConfigManager（Phase 6 会替换）
-    qmlRegisterSingletonInstance("LianwallGui", 1, 0, "ConfigManager", m_configManager);
-
     auto *ctx = m_engine->rootContext();
 
-    // DaemonState 暴露给 QML
+    // 核心组件暴露给 QML
     ctx->setContextProperty("DaemonState", m_daemonState);
+    ctx->setContextProperty("ConfigManager", m_configManager);
 
     // 壁纸模型暴露给 QML
     ctx->setContextProperty("WallpaperModel", m_wallpaperModel);
@@ -164,7 +162,8 @@ void Application::registerQmlTypes()
     m_engine->addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider());
 
     // Application 自身暴露给 QML（窗口控制）
-    ctx->setContextProperty("App", this);
+    // 注意：不能叫 "App"，会与 QML 的 import "." as App 别名冲突
+    ctx->setContextProperty("LianwallApp", this);
 
     // 常量
     ctx->setContextProperty("AppVersion",      APP_VERSION);
@@ -256,6 +255,12 @@ void Application::quit()
 {
     qDebug() << "[Application] Quitting...";
     emit aboutToQuit();
+
+    // 关闭 daemon（daemon 会自行清理 mpvpaper/swww 等子进程）
+    if (m_daemonClient->isConnected()) {
+        m_daemonClient->shutdown();
+    }
+
     m_daemonClient->disconnectFromDaemon();
     m_trayIcon->hide();
     m_app->quit();

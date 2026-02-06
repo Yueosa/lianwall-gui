@@ -479,7 +479,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: App.daemonReloadConfig()
+                                onClicked: LianwallApp.daemonReloadConfig()
                             }
                         }
                     }
@@ -529,7 +529,7 @@ Item {
                                 currentIndex: ConfigManager.language === "en" ? 1 : 0
                                 onActivated: {
                                     ConfigManager.setLanguage(model[currentIndex].value)
-                                    App.switchLanguage(model[currentIndex].value)
+                                    LianwallApp.switchLanguage(model[currentIndex].value)
                                 }
 
                                 background: Rectangle {

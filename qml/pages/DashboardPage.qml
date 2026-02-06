@@ -179,26 +179,26 @@ Item {
                         ActionButton {
                             icon: "⏮️"
                             label: qsTr("上一张")
-                            onClicked: App.daemonPrev()
+                            onClicked: LianwallApp.daemonPrev()
                         }
 
                         ActionButton {
                             icon: "⏭️"
                             label: qsTr("下一张")
                             highlighted: true
-                            onClicked: App.daemonNext()
+                            onClicked: LianwallApp.daemonNext()
                         }
 
                         ActionButton {
                             icon: "🔒"
                             label: qsTr("锁定切换")
-                            onClicked: App.daemonToggleLock()
+                            onClicked: LianwallApp.daemonToggleLock()
                         }
 
                         ActionButton {
                             icon: "🔄"
                             label: qsTr("重新扫描")
-                            onClicked: App.daemonRescan()
+                            onClicked: LianwallApp.daemonRescan()
                         }
                     }
                 }

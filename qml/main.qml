@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import LianwallGui 1.0
 import "." as App
 import "components" as Components
 import "pages" as Pages
@@ -23,7 +22,7 @@ ApplicationWindow {
     // 关闭窗口 = 隐藏到托盘
     onClosing: function(close) {
         close.accepted = false
-        App.hideMainWindow()
+        LianwallApp.hideMainWindow()
     }
 
     // 主题初始化
