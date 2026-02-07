@@ -17,7 +17,7 @@ static const QStringList kVideoExtensions = {
     "mp4", "mkv", "webm", "avi", "mov", "flv", "wmv", "m4v", "3gp", "ogv", "ts", "m2ts",
 };
 
-static constexpr int kDefaultThumbSize = 320;   // 默认缩略图尺寸
+static constexpr int kDefaultThumbSize = 720;   // 默认缩略图尺寸
 static constexpr int kFfmpegTimeoutMs = 10000;  // ffmpeg 超时 10s
 
 // ============================================================================
@@ -121,8 +121,8 @@ QImage ThumbnailResponse::loadVideoFrame() const
     ffmpeg.setProcessChannelMode(QProcess::ForwardedErrorChannel);
 
     QStringList args = {
-        "-ss", "5",                    // 跳到第 5 秒
         "-i", m_path,                  // 输入文件
+        "-ss", "1",                    // 跳到第 1 秒（放在 -i 后 = output seeking，更可靠）
         "-vframes", "1",               // 只截 1 帧
         "-vf", QStringLiteral("scale=%1:%2:force_original_aspect_ratio=decrease")
                    .arg(m_requestedSize.width())
@@ -154,7 +154,7 @@ QImage ThumbnailResponse::loadVideoFrame() const
         // ffmpeg -ss 5 可能失败（视频不够长），尝试 -ss 0
         QProcess retry;
         retry.setProcessChannelMode(QProcess::ForwardedErrorChannel);
-        args[1] = "0";   // -ss 0
+        args[2] = "0";   // -ss 0
         retry.start(QStringLiteral("ffmpeg"), args);
 
         if (!retry.waitForStarted(5000) || !retry.waitForFinished(kFfmpegTimeoutMs)) {

@@ -88,8 +88,8 @@ public:
     QString language() const;
 
     // --- 本地设置 Setters ---
-    void setTheme(const QString &theme);
-    void setLanguage(const QString &lang);
+    Q_INVOKABLE void setTheme(const QString &theme);
+    Q_INVOKABLE void setLanguage(const QString &lang);
 
     // ========================================================================
     // QML 可调用的 Daemon 配置写操作
