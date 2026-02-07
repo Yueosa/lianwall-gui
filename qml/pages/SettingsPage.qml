@@ -425,7 +425,7 @@ Item {
                             }
                         }
 
-                        // Systemd 服务路径
+                        // Systemd 服务
                         ConfigRow {
                             label: qsTr("Systemd 服务")
 
@@ -446,8 +446,24 @@ Item {
                                     spacing: App.Theme.spacingSmall
 
                                     SmallButton {
-                                        text: qsTr("📄 打开服务文件")
-                                        onClicked: Qt.openUrlExternally("file://" + settingsRoot.systemdServicePath)
+                                        text: qsTr("▶️ 启用并启动")
+                                        onClicked: {
+                                            LianwallApp.runSystemdCommand("enable")
+                                            LianwallApp.runSystemdCommand("start")
+                                        }
+                                    }
+
+                                    SmallButton {
+                                        text: qsTr("⏹️ 停止并禁用")
+                                        onClicked: {
+                                            LianwallApp.runSystemdCommand("stop")
+                                            LianwallApp.runSystemdCommand("disable")
+                                        }
+                                    }
+
+                                    SmallButton {
+                                        text: qsTr("🔄 重启")
+                                        onClicked: LianwallApp.runSystemdCommand("restart")
                                     }
 
                                     SmallButton {

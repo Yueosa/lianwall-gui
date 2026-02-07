@@ -3,6 +3,7 @@
 #include "Constants.h"
 #include "DaemonClient.h"
 #include "DaemonState.h"
+#include "DaemonTypes.h"
 #include "WallpaperListModel.h"
 #include "ThumbnailProvider.h"
 
@@ -13,6 +14,7 @@
 #include <QAction>
 #include <QWindow>
 #include <QTimer>
+#include <QProcess>
 
 using namespace LianwallGui;
 
@@ -98,6 +100,19 @@ void Application::initSystemTray()
     auto *prevAction = m_trayMenu->addAction(tr("上一张"));
     connect(prevAction, &QAction::triggered, this, [this]() {
         m_daemonClient->prev();
+    });
+
+    m_trayMenu->addSeparator();
+
+    // 模式切换
+    auto *modeMenu = m_trayMenu->addMenu(tr("切换模式"));
+    auto *videoModeAction = modeMenu->addAction(tr("🎬 动态壁纸 (Video)"));
+    connect(videoModeAction, &QAction::triggered, this, [this]() {
+        daemonSetMode("Video");
+    });
+    auto *imageModeAction = modeMenu->addAction(tr("🖼️ 静态壁纸 (Image)"));
+    connect(imageModeAction, &QAction::triggered, this, [this]() {
+        daemonSetMode("Image");
     });
 
     m_trayMenu->addSeparator();
@@ -336,6 +351,22 @@ void Application::daemonReloadConfig()
 {
     if (m_daemonClient->isConnected())
         m_daemonClient->reloadConfig();
+}
+
+void Application::daemonSetMode(const QString &mode)
+{
+    if (m_daemonClient->isConnected()) {
+        auto m = Daemon::wallModeFromString(mode);
+        m_daemonClient->setMode(m);
+    }
+}
+
+void Application::runSystemdCommand(const QString &action)
+{
+    // systemctl --user <action> lianwalld.service
+    QStringList args = {"--user", action, "lianwalld.service"};
+    QProcess::startDetached("systemctl", args);
+    qDebug() << "[Application] systemctl" << args;
 }
 
 // ============================================================================

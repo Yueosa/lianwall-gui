@@ -16,8 +16,9 @@ Item {
     property int displaySecs: -1
 
     // 从配置推算的总间隔（用于进度条比例）
-    // 当 daemon 首次推送 nextSwitchSecs 时，以此作为 total 基准
-    property int totalSecs: 600
+    property int totalSecs: DaemonState.mode === "Video"
+                            ? ConfigManager.videoInterval
+                            : ConfigManager.imageInterval
 
     // 是否有效（daemon 已连接且有倒计时值）
     readonly property bool isActive: DaemonState.daemonConnected && displaySecs >= 0
@@ -42,9 +43,6 @@ Item {
     onServerSecsChanged: {
         if (serverSecs >= 0) {
             displaySecs = serverSecs
-            // 首次或 server 值更大时更新 total 基准
-            if (serverSecs > totalSecs * 0.9)
-                totalSecs = serverSecs
         }
     }
 

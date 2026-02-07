@@ -9,6 +9,9 @@ import "../components" as Components
 Item {
     id: dashRoot
 
+    // 用于强制刷新预览图的时间戳
+    property int previewTimestamp: 0
+
     // 判断当前壁纸是否为视频
     readonly property bool isVideo: {
         var ext = DaemonState.currentPath.split('.').pop().toLowerCase()
@@ -62,10 +65,12 @@ Item {
                                 anchors.fill: parent
                                 source: {
                                     if (!DaemonState.currentPath) return ""
+                                    // 时间戳确保壁纸切换后刷新缩略图
+                                    var ts = dashRoot.previewTimestamp
                                     if (dashRoot.isVideo) {
-                                        return "image://thumbnail/" + encodeURIComponent(DaemonState.currentPath)
+                                        return "image://thumbnail/" + encodeURIComponent(DaemonState.currentPath) + "?t=" + ts
                                     }
-                                    return "file://" + DaemonState.currentPath
+                                    return "file://" + DaemonState.currentPath + "?t=" + ts
                                 }
                                 fillMode: Image.PreserveAspectCrop
                                 asynchronous: true
@@ -190,6 +195,12 @@ Item {
                         }
 
                         ActionButton {
+                            icon: DaemonState.mode === "Video" ? "🎬" : "🖼️"
+                            label: DaemonState.mode === "Video" ? qsTr("切到图片") : qsTr("切到视频")
+                            onClicked: LianwallApp.daemonSetMode(DaemonState.mode === "Video" ? "Image" : "Video")
+                        }
+
+                        ActionButton {
                             icon: "🔒"
                             label: qsTr("锁定切换")
                             onClicked: LianwallApp.daemonToggleLock()
@@ -308,6 +319,14 @@ Item {
                 // 底部间距
                 Item { Layout.preferredHeight: App.Theme.spacingMedium }
             }
+        }
+    }
+
+    // 壁纸切换时刷新预览
+    Connections {
+        target: DaemonState
+        function onCurrentPathChanged() {
+            dashRoot.previewTimestamp = Date.now()
         }
     }
 

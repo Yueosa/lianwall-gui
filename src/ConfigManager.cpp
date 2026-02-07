@@ -249,7 +249,19 @@ void ConfigManager::sendSetConfig(const QString &key, const QJsonValue &value)
 
 void ConfigManager::setMode(const QString &mode)
 {
-    sendSetConfig("paths.mode", mode);
+    if (!m_client->isConnected()) {
+        emit errorOccurred(tr("守护进程未连接"));
+        return;
+    }
+    // 使用专用的 SetMode 命令（而非 SetConfig）
+    auto m = Daemon::wallModeFromString(mode);
+    m_client->setMode(m, [this](const Daemon::Response &resp) {
+        if (resp.type == Daemon::ResponseType::Error) {
+            auto err = resp.asError();
+            qWarning() << "[ConfigManager] SetMode failed:" << err.message;
+            emit errorOccurred(err.message);
+        }
+    });
 }
 
 void ConfigManager::setVideoInterval(int secs)
