@@ -199,7 +199,8 @@ void WallpaperFilterModel::setSearchText(const QString &text)
         return;
     m_searchText = text;
     emit searchTextChanged();
-    invalidateRowsFilter();
+    beginFilterChange();
+    endFilterChange();
 }
 
 void WallpaperFilterModel::setLockFilter(int filter)
@@ -208,7 +209,8 @@ void WallpaperFilterModel::setLockFilter(int filter)
         return;
     m_lockFilter = filter;
     emit lockFilterChanged();
-    invalidateRowsFilter();
+    beginFilterChange();
+    endFilterChange();
 }
 
 bool WallpaperFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const
