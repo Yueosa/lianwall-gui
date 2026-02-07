@@ -12,7 +12,7 @@ namespace LianwallGui {
 // 版本信息
 // ============================================================================
 constexpr const char* APP_NAME = "LianWall";
-constexpr const char* APP_VERSION = "1.0.0";
+constexpr const char* APP_VERSION = "1.1.0";
 constexpr const char* APP_AUTHOR = "Lian";
 constexpr const char* APP_GITHUB_GUI = "https://github.com/Yueosa/lianwall-gui";
 constexpr const char* APP_GITHUB_DAEMON = "https://github.com/Yueosa/lianwall";
