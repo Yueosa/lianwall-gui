@@ -77,6 +77,13 @@ void DaemonClient::disconnectFromDaemon()
         m_socket->disconnectFromServer();
 }
 
+void DaemonClient::setAutoReconnect(bool enabled)
+{
+    m_autoReconnect = enabled;
+    if (!enabled)
+        m_reconnectTimer->stop();
+}
+
 // ============================================================================
 // 槽函数
 // ============================================================================
@@ -134,12 +141,21 @@ void DaemonClient::onSocketError(QLocalSocket::LocalSocketError error)
 {
     Q_UNUSED(error)
     QString msg = m_socket->errorString();
-    qDebug() << "[DaemonClient] Socket error:" << msg;
+    qDebug() << "[DaemonClient] Socket error:" << msg
+             << "path=" << m_socketPath
+             << "state=" << m_socket->state();
     emit errorOccurred(msg);
 
     // 首次连接失败时尝试自动拉起 daemon
     if (!m_daemonStartAttempted && m_autoReconnect) {
         tryStartDaemon();
+    }
+
+    // 连接失败后安排重连（onDisconnected 只在已连接后断开时触发）
+    if (m_autoReconnect && !m_reconnectTimer->isActive()) {
+        qDebug() << "[DaemonClient] Scheduling reconnect in" << m_reconnectDelay << "ms";
+        m_reconnectTimer->start(m_reconnectDelay);
+        m_reconnectDelay = qMin(m_reconnectDelay * 2, kMaxReconnectDelay);
     }
 }
 

@@ -64,10 +64,12 @@ private:
     void initSystemTray();
     void registerQmlTypes();
     void loadTranslations();
+    void doFinalQuit();
 
     // 托盘图标点击处理
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
 
+    bool m_quitting = false;
     QApplication *m_app;
     QQmlApplicationEngine *m_engine;
     QTranslator *m_translator;

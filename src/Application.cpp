@@ -12,6 +12,7 @@
 #include <QDebug>
 #include <QAction>
 #include <QWindow>
+#include <QTimer>
 
 using namespace LianwallGui;
 
@@ -48,7 +49,12 @@ Application::Application(int &argc, char **argv)
 
 Application::~Application()
 {
-    delete m_trayMenu;   // trayIcon 通过 parent 自动删除
+    // 必须先销毁 QML engine，再销毁它引用的 C++ 对象
+    // 否则 engine 析构时 QML 绑定可能访问已释放的 contextProperty
+    delete m_engine;
+    m_engine = nullptr;
+
+    delete m_trayMenu;
     delete m_app;
 }
 
@@ -253,16 +259,45 @@ void Application::toggleMainWindow()
 
 void Application::quit()
 {
+    if (m_quitting) return;    // 防止重入
+    m_quitting = true;
     qDebug() << "[Application] Quitting...";
     emit aboutToQuit();
-
-    // 关闭 daemon（daemon 会自行清理 mpvpaper/swww 等子进程）
-    if (m_daemonClient->isConnected()) {
-        m_daemonClient->shutdown();
-    }
-
-    m_daemonClient->disconnectFromDaemon();
     m_trayIcon->hide();
+
+    // 发送 Shutdown 命令关闭 daemon
+    // daemon 收到后会清理 mpvpaper/swww，然后关闭 socket
+    if (m_daemonClient->isConnected()) {
+        // 禁止自动重连（daemon 关闭后不要尝试重新连接）
+        m_daemonClient->setAutoReconnect(false);
+
+        // daemon 关闭时 socket 会断开，触发 doFinalQuit
+        connect(m_daemonClient, &DaemonClient::connectionChanged,
+                this, [this](bool connected) {
+            if (!connected && m_quitting) {
+                qDebug() << "[Application] Daemon shut down, exiting GUI";
+                doFinalQuit();
+            }
+        });
+
+        // 安全超时：daemon 如果 3 秒内没关掉就强制退出
+        QTimer::singleShot(3000, this, [this]() {
+            if (m_quitting) {
+                qWarning() << "[Application] Daemon shutdown timeout, force quit";
+                doFinalQuit();
+            }
+        });
+
+        m_daemonClient->shutdown();
+    } else {
+        // daemon 本身没连上，直接退出
+        doFinalQuit();
+    }
+}
+
+void Application::doFinalQuit()
+{
+    m_daemonClient->disconnectFromDaemon();
     m_app->quit();
 }
 
