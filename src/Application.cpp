@@ -94,12 +94,16 @@ void Application::initSystemTray()
 
     auto *nextAction = m_trayMenu->addAction(tr("下一张"));
     connect(nextAction, &QAction::triggered, this, [this]() {
-        m_daemonClient->next();
+        qDebug() << "[Tray] Next clicked, connected:" << m_daemonClient->isConnected();
+        if (m_daemonClient->isConnected())
+            m_daemonClient->next();
     });
 
     auto *prevAction = m_trayMenu->addAction(tr("上一张"));
     connect(prevAction, &QAction::triggered, this, [this]() {
-        m_daemonClient->prev();
+        qDebug() << "[Tray] Prev clicked, connected:" << m_daemonClient->isConnected();
+        if (m_daemonClient->isConnected())
+            m_daemonClient->prev();
     });
 
     m_trayMenu->addSeparator();
@@ -322,12 +326,14 @@ void Application::doFinalQuit()
 
 void Application::daemonNext()
 {
+    qDebug() << "[Application] daemonNext() called, connected:" << m_daemonClient->isConnected();
     if (m_daemonClient->isConnected())
         m_daemonClient->next();
 }
 
 void Application::daemonPrev()
 {
+    qDebug() << "[Application] daemonPrev() called, connected:" << m_daemonClient->isConnected();
     if (m_daemonClient->isConnected())
         m_daemonClient->prev();
 }
@@ -336,6 +342,7 @@ void Application::daemonToggleLock()
 {
     if (m_daemonClient->isConnected()) {
         auto path = m_daemonState->currentPath();
+        qDebug() << "[Application] daemonToggleLock() path:" << path;
         if (!path.isEmpty())
             m_daemonClient->toggleLock(path);
     }
@@ -343,18 +350,22 @@ void Application::daemonToggleLock()
 
 void Application::daemonRescan()
 {
+    qDebug() << "[Application] daemonRescan() called";
     if (m_daemonClient->isConnected())
         m_daemonClient->rescan();
 }
 
 void Application::daemonReloadConfig()
 {
+    qDebug() << "[Application] daemonReloadConfig() called";
     if (m_daemonClient->isConnected())
         m_daemonClient->reloadConfig();
 }
 
 void Application::daemonSetMode(const QString &mode)
 {
+    qDebug() << "[Application] daemonSetMode() called, mode:" << mode
+             << "connected:" << m_daemonClient->isConnected();
     if (m_daemonClient->isConnected()) {
         auto m = Daemon::wallModeFromString(mode);
         m_daemonClient->setMode(m);

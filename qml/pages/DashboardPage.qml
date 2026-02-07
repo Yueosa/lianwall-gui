@@ -9,11 +9,12 @@ import "../components" as Components
 Item {
     id: dashRoot
 
-    // 用于强制刷新预览图的时间戳
-    property int previewTimestamp: 0
+    // 用于强制刷新预览图的计数器（每次递增，避免 Date.now() 溢出 int 上限）
+    property int refreshCounter: 0
 
     // 判断当前壁纸是否为视频
     readonly property bool isVideo: {
+        if (!DaemonState.currentPath || DaemonState.currentPath.length === 0) return false
         var ext = DaemonState.currentPath.split('.').pop().toLowerCase()
         return ["mp4","mkv","webm","avi","mov","flv","wmv","m4v","3gp","ogv","ts","m2ts"].indexOf(ext) >= 0
     }
@@ -64,13 +65,14 @@ Item {
                                 id: previewImage
                                 anchors.fill: parent
                                 source: {
-                                    if (!DaemonState.currentPath) return ""
-                                    // 时间戳确保壁纸切换后刷新缩略图
-                                    var ts = dashRoot.previewTimestamp
+                                    var p = DaemonState.currentPath
+                                    if (!p || p.length === 0) return ""
+                                    var n = dashRoot.refreshCounter
                                     if (dashRoot.isVideo) {
-                                        return "image://thumbnail/" + encodeURIComponent(DaemonState.currentPath) + "?t=" + ts
+                                        return "image://thumbnail/" + encodeURIComponent(p) + "?t=" + n
                                     }
-                                    return "file://" + DaemonState.currentPath + "?t=" + ts
+                                    // 图片用 fragment(#) 强制刷新，不影响 file:// 路径解析
+                                    return "file://" + p + "#" + n
                                 }
                                 fillMode: Image.PreserveAspectCrop
                                 asynchronous: true
@@ -91,7 +93,7 @@ Item {
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
                                     text: DaemonState.currentPath
-                                          ? (dashRoot.isVideo ? qsTr("视频壁纸（缩略图即将支持）") : qsTr("加载中..."))
+                                          ? qsTr("加载中...")
                                           : qsTr("暂无壁纸")
                                     font.pixelSize: App.Theme.fontSizeSmall
                                     color: App.Theme.textSecondary
@@ -195,21 +197,13 @@ Item {
                         }
 
                         ActionButton {
-                            icon: DaemonState.mode === "Video" ? "🎬" : "🖼️"
+                            icon: DaemonState.mode === "Video" ? "🖼️" : "🎬"
                             label: DaemonState.mode === "Video" ? qsTr("切到图片") : qsTr("切到视频")
-                            onClicked: LianwallApp.daemonSetMode(DaemonState.mode === "Video" ? "Image" : "Video")
-                        }
-
-                        ActionButton {
-                            icon: "🔒"
-                            label: qsTr("锁定切换")
-                            onClicked: LianwallApp.daemonToggleLock()
-                        }
-
-                        ActionButton {
-                            icon: "🔄"
-                            label: qsTr("重新扫描")
-                            onClicked: LianwallApp.daemonRescan()
+                            onClicked: {
+                                var target = DaemonState.mode === "Video" ? "Image" : "Video"
+                                console.log("[Dashboard] Switch mode:", DaemonState.mode, "->", target)
+                                LianwallApp.daemonSetMode(target)
+                            }
                         }
                     }
                 }
@@ -322,11 +316,16 @@ Item {
         }
     }
 
-    // 壁纸切换时刷新预览
+    // 壁纸/模式变化时刷新预览
     Connections {
         target: DaemonState
         function onCurrentPathChanged() {
-            dashRoot.previewTimestamp = Date.now()
+            console.log("[Dashboard] currentPath changed:", DaemonState.currentPath)
+            dashRoot.refreshCounter++
+        }
+        function onModeChanged() {
+            console.log("[Dashboard] mode changed:", DaemonState.mode)
+            dashRoot.refreshCounter++
         }
     }
 

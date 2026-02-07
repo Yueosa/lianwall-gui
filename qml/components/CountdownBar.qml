@@ -41,6 +41,7 @@ Item {
 
     // 当 daemon 推送新值时重置
     onServerSecsChanged: {
+        console.log("[CountdownBar] serverSecs changed:", serverSecs)
         if (serverSecs >= 0) {
             displaySecs = serverSecs
         }
@@ -50,8 +51,17 @@ Item {
     Connections {
         target: DaemonState
         function onWallpaperChanged(path, filename, trigger) {
-            // 等待 daemon 推送新的 nextSwitchSecs
+            console.log("[CountdownBar] wallpaper changed, resetting countdown")
+            // 先清零再等 daemon 推送新的 nextSwitchSecs
             displaySecs = -1
+        }
+        function onNextSwitchSecsChanged() {
+            // 直接从 DaemonState 获取最新值（比 property 绑定更可靠）
+            var secs = DaemonState.nextSwitchSecs
+            console.log("[CountdownBar] nextSwitchSecs updated:", secs)
+            if (secs >= 0) {
+                displaySecs = secs
+            }
         }
     }
 

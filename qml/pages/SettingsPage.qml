@@ -2,10 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".." as App
-import "../components" as Components
 
 /// Settings 设置页
-/// 4 个配置分区 + Systemd 服务路径
+/// 壁纸路径 + 界面设置
 Item {
     id: settingsRoot
 
@@ -71,34 +70,14 @@ Item {
                 }
 
                 // ============================================================
-                // 分区 1：路径与模式
+                // 分区 1：壁纸路径
                 // ============================================================
                 ConfigSection {
-                    title: qsTr("📂 路径与模式")
+                    title: qsTr("📂 壁纸路径")
 
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: App.Theme.spacingMedium
-
-                        // 运行模式
-                        ConfigRow {
-                            label: qsTr("运行模式")
-
-                            RowLayout {
-                                spacing: App.Theme.spacingSmall
-
-                                ModeChip {
-                                    text: "🎬 Video"
-                                    selected: ConfigManager.mode === "Video"
-                                    onClicked: ConfigManager.setMode("Video")
-                                }
-                                ModeChip {
-                                    text: "🖼️ Image"
-                                    selected: ConfigManager.mode === "Image"
-                                    onClicked: ConfigManager.setMode("Image")
-                                }
-                            }
-                        }
 
                         // 视频壁纸目录
                         ConfigRow {
@@ -151,358 +130,7 @@ Item {
                 }
 
                 // ============================================================
-                // 分区 2：动态壁纸引擎
-                // ============================================================
-                ConfigSection {
-                    title: qsTr("🎬 动态壁纸引擎 (mpvpaper)")
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: App.Theme.spacingMedium
-
-                        // 切换间隔
-                        ConfigRow {
-                            label: qsTr("切换间隔 (秒)")
-                            hint: "10 – 86400"
-
-                            SpinBox {
-                                from: 10
-                                to: 86400
-                                stepSize: 10
-                                value: ConfigManager.videoInterval
-                                editable: true
-                                onValueModified: ConfigManager.setVideoInterval(value)
-
-                                background: Rectangle {
-                                    radius: App.Theme.radiusSmall
-                                    color: App.Theme.surface
-                                    border.width: 1
-                                    border.color: App.Theme.border
-                                }
-                            }
-                        }
-
-                        // 目标显示器
-                        ConfigRow {
-                            label: qsTr("目标显示器")
-                            hint: qsTr('"*" 表示所有显示器')
-
-                            ConfigInput {
-                                text: ConfigManager.videoDisplay
-                                onEditingFinished: ConfigManager.setVideoDisplay(text)
-                            }
-                        }
-
-                        // mpvpaper 参数
-                        Components.TagEditor {
-                            Layout.fillWidth: true
-                            label: qsTr("mpvpaper 参数")
-                            tags: ConfigManager.mpvpaperArgs
-                            onTagsEdited: function(newTags) {
-                                ConfigManager.setMpvpaperArgs(newTags)
-                            }
-                        }
-
-                        // mpv 参数
-                        Components.TagEditor {
-                            Layout.fillWidth: true
-                            label: qsTr("mpv 参数")
-                            tags: ConfigManager.mpvArgs
-                            onTagsEdited: function(newTags) {
-                                ConfigManager.setMpvArgs(newTags)
-                            }
-                        }
-                    }
-                }
-
-                // ============================================================
-                // 分区 3：静态壁纸引擎
-                // ============================================================
-                ConfigSection {
-                    title: qsTr("🖼️ 静态壁纸引擎 (swww)")
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: App.Theme.spacingMedium
-
-                        // 切换间隔
-                        ConfigRow {
-                            label: qsTr("切换间隔 (秒)")
-                            hint: "10 – 86400"
-
-                            SpinBox {
-                                from: 10
-                                to: 86400
-                                stepSize: 10
-                                value: ConfigManager.imageInterval
-                                editable: true
-                                onValueModified: ConfigManager.setImageInterval(value)
-
-                                background: Rectangle {
-                                    radius: App.Theme.radiusSmall
-                                    color: App.Theme.surface
-                                    border.width: 1
-                                    border.color: App.Theme.border
-                                }
-                            }
-                        }
-
-                        // 输出目标
-                        ConfigRow {
-                            label: qsTr("输出目标 (outputs)")
-                            hint: qsTr('留空或逗号分隔')
-
-                            ConfigInput {
-                                text: ConfigManager.imageOutputs
-                                onEditingFinished: ConfigManager.setImageOutputs(text)
-                            }
-                        }
-
-                        // swww 参数
-                        Components.TagEditor {
-                            Layout.fillWidth: true
-                            label: qsTr("swww 参数")
-                            tags: ConfigManager.swwwArgs
-                            onTagsEdited: function(newTags) {
-                                ConfigManager.setSwwwArgs(newTags)
-                            }
-                        }
-                    }
-                }
-
-                // ============================================================
-                // 分区 4：显存监控
-                // ============================================================
-                ConfigSection {
-                    title: qsTr("🎮 显存监控 (VRAM)")
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: App.Theme.spacingMedium
-
-                        // 启用开关
-                        ConfigRow {
-                            label: qsTr("启用监控")
-
-                            Switch {
-                                checked: ConfigManager.vramEnabled
-                                onToggled: ConfigManager.setVramEnabled(checked)
-                            }
-                        }
-
-                        // 降级阈值
-                        ConfigRow {
-                            label: qsTr("降级阈值 (%)")
-                            hint: "5.0 – 50.0"
-                            visible: ConfigManager.vramEnabled
-
-                            RowLayout {
-                                spacing: App.Theme.spacingSmall
-
-                                Slider {
-                                    Layout.fillWidth: true
-                                    from: 5.0
-                                    to: 50.0
-                                    stepSize: 0.5
-                                    value: ConfigManager.vramThresholdPercent
-                                    onMoved: ConfigManager.setVramThresholdPercent(value)
-                                }
-
-                                Text {
-                                    Layout.preferredWidth: 40
-                                    text: ConfigManager.vramThresholdPercent.toFixed(1)
-                                    font.pixelSize: App.Theme.fontSizeSmall
-                                    font.family: "monospace"
-                                    color: App.Theme.text
-                                    horizontalAlignment: Text.AlignRight
-                                }
-                            }
-                        }
-
-                        // 恢复阈值
-                        ConfigRow {
-                            label: qsTr("恢复阈值 (%)")
-                            hint: "20.0 – 80.0"
-                            visible: ConfigManager.vramEnabled
-
-                            RowLayout {
-                                spacing: App.Theme.spacingSmall
-
-                                Slider {
-                                    Layout.fillWidth: true
-                                    from: 20.0
-                                    to: 80.0
-                                    stepSize: 0.5
-                                    value: ConfigManager.vramRecoveryPercent
-                                    onMoved: ConfigManager.setVramRecoveryPercent(value)
-                                }
-
-                                Text {
-                                    Layout.preferredWidth: 40
-                                    text: ConfigManager.vramRecoveryPercent.toFixed(1)
-                                    font.pixelSize: App.Theme.fontSizeSmall
-                                    font.family: "monospace"
-                                    color: App.Theme.text
-                                    horizontalAlignment: Text.AlignRight
-                                }
-                            }
-                        }
-
-                        // 检测间隔
-                        ConfigRow {
-                            label: qsTr("检测间隔 (秒)")
-                            hint: "1 – 60"
-                            visible: ConfigManager.vramEnabled
-
-                            SpinBox {
-                                from: 1
-                                to: 60
-                                value: ConfigManager.vramCheckInterval
-                                editable: true
-                                onValueModified: ConfigManager.setVramCheckInterval(value)
-
-                                background: Rectangle {
-                                    radius: App.Theme.radiusSmall
-                                    color: App.Theme.surface
-                                    border.width: 1
-                                    border.color: App.Theme.border
-                                }
-                            }
-                        }
-
-                        // 冷却时间
-                        ConfigRow {
-                            label: qsTr("冷却时间 (秒)")
-                            hint: "10 – 600"
-                            visible: ConfigManager.vramEnabled
-
-                            SpinBox {
-                                from: 10
-                                to: 600
-                                stepSize: 10
-                                value: ConfigManager.vramCooldownSeconds
-                                editable: true
-                                onValueModified: ConfigManager.setVramCooldownSeconds(value)
-
-                                background: Rectangle {
-                                    radius: App.Theme.radiusSmall
-                                    color: App.Theme.surface
-                                    border.width: 1
-                                    border.color: App.Theme.border
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ============================================================
-                // 分区 5：守护进程
-                // ============================================================
-                ConfigSection {
-                    title: qsTr("🔧 守护进程")
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: App.Theme.spacingMedium
-
-                        // 日志级别
-                        ConfigRow {
-                            label: qsTr("日志级别")
-
-                            ComboBox {
-                                model: ["error", "warn", "info", "debug", "trace"]
-                                currentIndex: model.indexOf(ConfigManager.logLevel)
-                                onActivated: ConfigManager.setLogLevel(model[currentIndex])
-
-                                background: Rectangle {
-                                    radius: App.Theme.radiusSmall
-                                    color: App.Theme.surface
-                                    border.width: 1
-                                    border.color: App.Theme.border
-                                    implicitWidth: 140
-                                    implicitHeight: 32
-                                }
-                            }
-                        }
-
-                        // Systemd 服务
-                        ConfigRow {
-                            label: qsTr("Systemd 服务")
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: App.Theme.spacingTiny
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: settingsRoot.systemdServicePath
-                                    font.pixelSize: App.Theme.fontSizeSmall
-                                    font.family: "monospace"
-                                    color: App.Theme.textSecondary
-                                    elide: Text.ElideMiddle
-                                }
-
-                                RowLayout {
-                                    spacing: App.Theme.spacingSmall
-
-                                    SmallButton {
-                                        text: qsTr("▶️ 启用并启动")
-                                        onClicked: {
-                                            LianwallApp.runSystemdCommand("enable")
-                                            LianwallApp.runSystemdCommand("start")
-                                        }
-                                    }
-
-                                    SmallButton {
-                                        text: qsTr("⏹️ 停止并禁用")
-                                        onClicked: {
-                                            LianwallApp.runSystemdCommand("stop")
-                                            LianwallApp.runSystemdCommand("disable")
-                                        }
-                                    }
-
-                                    SmallButton {
-                                        text: qsTr("🔄 重启")
-                                        onClicked: LianwallApp.runSystemdCommand("restart")
-                                    }
-
-                                    SmallButton {
-                                        text: qsTr("📂 打开目录")
-                                        onClicked: Qt.openUrlExternally("file://" + settingsRoot.systemdDirPath)
-                                    }
-                                }
-                            }
-                        }
-
-                        // 重载配置按钮
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 36
-                            radius: App.Theme.radiusMedium
-                            color: reloadMouse.pressed ? App.Theme.accentPressed
-                                   : reloadMouse.containsMouse ? App.Theme.accentHover
-                                   : App.Theme.accent
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: qsTr("🔄 从文件重载 Daemon 配置")
-                                font.pixelSize: App.Theme.fontSizeMedium
-                                color: App.Theme.textOnAccent
-                            }
-
-                            MouseArea {
-                                id: reloadMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: LianwallApp.daemonReloadConfig()
-                            }
-                        }
-                    }
-                }
-
-                // ============================================================
-                // 分区 6：GUI 设置（本地）
+                // 分区 2：界面设置
                 // ============================================================
                 ConfigSection {
                     title: qsTr("🎨 界面设置")
@@ -566,14 +194,6 @@ Item {
             }
         }
     }
-
-    // ========================================================================
-    // 辅助函数
-    // ========================================================================
-
-    /// Systemd 服务文件路径
-    readonly property string systemdServicePath: HomeDir + "/.config/systemd/user/lianwalld.service"
-    readonly property string systemdDirPath: HomeDir + "/.config/systemd/user"
 
     // ========================================================================
     // 内联组件
@@ -707,31 +327,6 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: parent.clicked()
-        }
-    }
-
-    /// 配置输入框
-    component ConfigInput: Rectangle {
-        property alias text: input.text
-        signal editingFinished()
-
-        Layout.fillWidth: true
-        Layout.preferredHeight: 32
-        radius: App.Theme.radiusSmall
-        color: App.Theme.surface
-        border.width: 1
-        border.color: input.activeFocus ? App.Theme.accent : App.Theme.border
-
-        TextInput {
-            id: input
-            anchors.fill: parent
-            anchors.margins: App.Theme.spacingSmall
-            verticalAlignment: Text.AlignVCenter
-            font.pixelSize: App.Theme.fontSizeSmall
-            font.family: "monospace"
-            color: App.Theme.text
-            clip: true
-            onEditingFinished: parent.editingFinished()
         }
     }
 }
