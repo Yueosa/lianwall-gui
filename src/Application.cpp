@@ -38,6 +38,7 @@ Application::Application(int &argc, char **argv)
     m_app->setApplicationVersion(APP_VERSION);
     m_app->setOrganizationName(APP_AUTHOR);
     m_app->setOrganizationDomain("github.com/Yueosa");
+    m_app->setDesktopFileName(QStringLiteral("lianwall-gui"));
     m_app->setWindowIcon(QIcon(QStringLiteral(":/icons/lianwall.png")));
 
     // 关闭窗口 ≠ 退出进程（托盘驻留）
