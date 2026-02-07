@@ -395,6 +395,17 @@ void Application::runSystemdCommand(const QString &action)
 // 托盘
 // ============================================================================
 
+void Application::updateTrayModeAction()
+{
+    if (!m_trayModeAction)
+        return;
+    auto mode = m_daemonState->mode();
+    if (mode == QStringLiteral("Video"))
+        m_trayModeAction->setText(tr("🖼️ 切到图片"));
+    else
+        m_trayModeAction->setText(tr("🎬 切到视频"));
+}
+
 void Application::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 {
     switch (reason) {

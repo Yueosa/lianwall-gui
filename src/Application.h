@@ -67,6 +67,7 @@ private:
     void registerQmlTypes();
     void loadTranslations();
     void doFinalQuit();
+    void updateTrayModeAction();
 
     // 托盘图标点击处理
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
@@ -88,4 +89,5 @@ private:
     // 系统托盘
     QSystemTrayIcon *m_trayIcon;
     QMenu *m_trayMenu;
+    QAction *m_trayModeAction = nullptr;
 };
