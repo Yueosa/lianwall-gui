@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🖼️ LianWall GUI
+# 🖼️ lianwall-gui
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
@@ -20,6 +20,18 @@ Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态�
 > - **中/英双语** — 运行时切换，即时生效
 
 **关于版本更新日志，请查看 [CHANGELOG](./CHANGELOG.md)**
+
+---
+
+## 📸 界面预览
+
+| 仪表盘 | 壁纸库 |
+|:------:|:------:|
+| ![Dashboard](image/dashboard.png) | ![Library](image/library.png) |
+
+| 设置 | 关于 |
+|:----:|:----:|
+| ![Settings](image/settings.png) | ![About](image/about.png) |
 
 ---
 
