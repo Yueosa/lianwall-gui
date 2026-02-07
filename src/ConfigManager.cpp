@@ -9,6 +9,15 @@
 #include <QJsonArray>
 #include <QDebug>
 
+#include "Constants.h"
+
+/// 创建指向 ~/.config/lianwall/gui.conf 的 QSettings
+static QSettings guiSettings()
+{
+    static const QString path = LianwallGui::Paths::configDir() + "/gui.conf";
+    return QSettings(path, QSettings::IniFormat);
+}
+
 // ============================================================================
 // 构造
 // ============================================================================
@@ -42,13 +51,13 @@ ConfigManager::ConfigManager(DaemonClient *client, QObject *parent)
 
 QString ConfigManager::theme() const
 {
-    QSettings settings;
+    auto settings = guiSettings();
     return settings.value("app/theme", "lian").toString();
 }
 
 void ConfigManager::setTheme(const QString &theme)
 {
-    QSettings settings;
+    auto settings = guiSettings();
     if (settings.value("app/theme").toString() == theme)
         return;
     settings.setValue("app/theme", theme);
@@ -57,13 +66,13 @@ void ConfigManager::setTheme(const QString &theme)
 
 QString ConfigManager::accentColor() const
 {
-    QSettings settings;
+    auto settings = guiSettings();
     return settings.value("app/accentColor", "blue").toString();
 }
 
 void ConfigManager::setAccentColor(const QString &accent)
 {
-    QSettings settings;
+    auto settings = guiSettings();
     if (settings.value("app/accentColor").toString() == accent)
         return;
     settings.setValue("app/accentColor", accent);
@@ -72,13 +81,13 @@ void ConfigManager::setAccentColor(const QString &accent)
 
 QString ConfigManager::language() const
 {
-    QSettings settings;
+    auto settings = guiSettings();
     return settings.value("app/language", "zh_CN").toString();
 }
 
 void ConfigManager::setLanguage(const QString &lang)
 {
-    QSettings settings;
+    auto settings = guiSettings();
     if (settings.value("app/language").toString() == lang)
         return;
     settings.setValue("app/language", lang);
