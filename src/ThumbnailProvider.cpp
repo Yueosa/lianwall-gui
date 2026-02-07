@@ -220,5 +220,11 @@ ThumbnailProvider::~ThumbnailProvider()
 QQuickImageResponse *ThumbnailProvider::requestImageResponse(
     const QString &id, const QSize &requestedSize)
 {
-    return new ThumbnailResponse(id, requestedSize, &m_pool, &m_ffmpegSemaphore);
+    // 剥离 QML cache-busting 参数 (?t=N)
+    QString cleanId = id;
+    int queryIdx = cleanId.indexOf(QLatin1Char('?'));
+    if (queryIdx >= 0)
+        cleanId = cleanId.left(queryIdx);
+
+    return new ThumbnailResponse(cleanId, requestedSize, &m_pool, &m_ffmpegSemaphore);
 }

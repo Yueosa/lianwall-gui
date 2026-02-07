@@ -2,20 +2,20 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".." as App
-import "../components" as Components
 
 /// Dashboard 仪表盘
-/// 当前壁纸预览 + 状态信息 + 快捷操作 + 倒计时
+/// 当前壁纸预览 + 状态信息 + 快捷操作
 Item {
     id: dashRoot
 
     // 用于强制刷新预览图的计数器（每次递增，避免 Date.now() 溢出 int 上限）
     property int refreshCounter: 0
 
-    // 判断当前壁纸是否为视频
+    // 判断当前壁纸是否为视频（基于文件扩展名，不依赖 mode — 因为 mode 和 path 不一定同时更新）
     readonly property bool isVideo: {
-        if (!DaemonState.currentPath || DaemonState.currentPath.length === 0) return false
-        var ext = DaemonState.currentPath.split('.').pop().toLowerCase()
+        var p = DaemonState.currentPath
+        if (!p || p.length === 0) return false
+        var ext = p.substring(p.lastIndexOf('.') + 1).toLowerCase()
         return ["mp4","mkv","webm","avi","mov","flv","wmv","m4v","3gp","ogv","ts","m2ts"].indexOf(ext) >= 0
     }
 
@@ -141,26 +141,6 @@ Item {
                             color: App.Theme.textSecondary
                             elide: Text.ElideMiddle
                         }
-                    }
-                }
-
-                // ============================================================
-                // 倒计时
-                // ============================================================
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: countdownBar.height + App.Theme.spacingMedium * 2
-                    radius: App.Theme.radiusLarge
-                    color: App.Theme.card
-                    border.width: 1
-                    border.color: App.Theme.border
-
-                    Components.CountdownBar {
-                        id: countdownBar
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.margins: App.Theme.spacingMedium
                     }
                 }
 
