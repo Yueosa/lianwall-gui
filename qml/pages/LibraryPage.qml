@@ -145,14 +145,12 @@ Item {
                 border.color: App.Theme.border
 
                 Text {
+                    id: refreshIcon
                     anchors.centerIn: parent
                     text: "🔄"
                     font.pixelSize: 16
-                    rotation: WallpaperModel.loading ? refreshAnim.angle : 0
 
-                    NumberAnimation on rotation {
-                        id: refreshAnim
-                        property real angle: 0
+                    RotationAnimation on rotation {
                         running: WallpaperModel.loading
                         from: 0; to: 360
                         duration: 1000

@@ -189,7 +189,8 @@ WallpaperFilterModel::WallpaperFilterModel(QObject *parent)
     // 数据变化时更新 count
     connect(this, &QAbstractItemModel::rowsInserted,  this, &WallpaperFilterModel::countChanged);
     connect(this, &QAbstractItemModel::rowsRemoved,   this, &WallpaperFilterModel::countChanged);
-    connect(this, &QAbstractItemModel::modelReset,     this, &WallpaperFilterModel::countChanged);
+    connect(this, &QAbstractItemModel::modelReset,    this, &WallpaperFilterModel::countChanged);
+    connect(this, &QAbstractItemModel::layoutChanged, this, &WallpaperFilterModel::countChanged);
 }
 
 void WallpaperFilterModel::setSearchText(const QString &text)
@@ -198,8 +199,7 @@ void WallpaperFilterModel::setSearchText(const QString &text)
         return;
     m_searchText = text;
     emit searchTextChanged();
-    beginFilterChange();
-    endFilterChange();
+    invalidateFilter();
 }
 
 void WallpaperFilterModel::setLockFilter(int filter)
@@ -208,8 +208,7 @@ void WallpaperFilterModel::setLockFilter(int filter)
         return;
     m_lockFilter = filter;
     emit lockFilterChanged();
-    beginFilterChange();
-    endFilterChange();
+    invalidateFilter();
 }
 
 bool WallpaperFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const

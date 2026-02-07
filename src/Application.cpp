@@ -365,8 +365,18 @@ void Application::runSystemdCommand(const QString &action)
 {
     // systemctl --user <action> lianwalld.service
     QStringList args = {"--user", action, "lianwalld.service"};
-    QProcess::startDetached("systemctl", args);
     qDebug() << "[Application] systemctl" << args;
+
+    auto *proc = new QProcess(this);
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [proc](int exitCode, QProcess::ExitStatus) {
+        if (exitCode != 0) {
+            auto err = proc->readAllStandardError().trimmed();
+            qWarning() << "[Application] systemctl failed:" << err;
+        }
+        proc->deleteLater();
+    });
+    proc->start("systemctl", args);
 }
 
 // ============================================================================

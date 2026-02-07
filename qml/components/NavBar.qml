@@ -134,17 +134,21 @@ Item {
                     spacing: 6
 
                     Rectangle {
+                        id: statusDot
                         width: 8; height: 8
                         radius: 4
                         anchors.verticalCenter: parent.verticalCenter
                         color: navRoot.daemonConnected ? App.Theme.success : App.Theme.error
 
-                        // 连接时脉冲动画
+                        // 断线时脉冲动画
                         SequentialAnimation on opacity {
                             running: !navRoot.daemonConnected
                             loops: Animation.Infinite
                             NumberAnimation { to: 0.3; duration: 800; easing.type: Easing.InOutQuad }
                             NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutQuad }
+                            onRunningChanged: {
+                                if (!running) statusDot.opacity = 1.0
+                            }
                         }
                     }
 
