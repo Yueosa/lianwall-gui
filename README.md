@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🖼️ lianwall-gui
+# 🖼️ LianWall GUI
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
