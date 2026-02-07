@@ -459,7 +459,7 @@ Item {
             color: selectMouse.pressed ? App.Theme.cardHover
                    : selectMouse.containsMouse ? App.Theme.surface : App.Theme.input
             border.width: 1
-            border.color: selectDropdown.visible ? App.Theme.accent : App.Theme.border
+            border.color: selectPopup.visible ? App.Theme.accent : App.Theme.border
 
             Behavior on border.color { ColorAnimation { duration: 150 } }
 
@@ -481,7 +481,7 @@ Item {
                 Text {
                     id: dropdownArrow
                     anchors.verticalCenter: parent.verticalCenter
-                    text: selectDropdown.visible ? "▲" : "▼"
+                    text: selectPopup.visible ? "▲" : "▼"
                     font.pixelSize: 8
                     color: App.Theme.textSecondary
                 }
@@ -492,39 +492,34 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: selectDropdown.visible = !selectDropdown.visible
+                onClicked: selectPopup.visible = !selectPopup.visible
             }
         }
 
-        // 下拉面板
-        Rectangle {
-            id: selectDropdown
-            visible: false
+        // 下拉面板（使用 Popup 自动处理点击外部关闭）
+        Popup {
+            id: selectPopup
             y: selectButton.height + 4
             width: selectRoot.selectWidth
-            height: dropdownCol.height + 8
-            radius: App.Theme.radiusMedium
-            color: App.Theme.popup
-            border.width: 1
-            border.color: App.Theme.border
-            z: 100
+            padding: 4
+            closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
 
-            // 阴影效果
-            layer.enabled: true
-            layer.effect: Item {}  // 简单 z 提升
+            background: Rectangle {
+                radius: App.Theme.radiusMedium
+                color: App.Theme.popup
+                border.width: 1
+                border.color: App.Theme.border
+            }
 
-            Column {
+            contentItem: Column {
                 id: dropdownCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: 4
+                spacing: 0
 
                 Repeater {
                     model: selectRoot.model
 
                     Rectangle {
-                        width: dropdownCol.width
+                        width: selectRoot.selectWidth - 8
                         height: 32
                         radius: App.Theme.radiusSmall
                         color: index === selectRoot.currentIndex ? App.Theme.accent
@@ -533,7 +528,7 @@ Item {
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
-                            anchors.leftMargin: 10
+                            anchors.leftMargin: 8
                             text: modelData.text
                             font.pixelSize: App.Theme.fontSizeSmall
                             color: index === selectRoot.currentIndex ? App.Theme.textOnAccent
@@ -548,22 +543,12 @@ Item {
                             onClicked: {
                                 selectRoot.currentIndex = index
                                 selectRoot.selected(index)
-                                selectDropdown.visible = false
+                                selectPopup.close()
                             }
                         }
                     }
                 }
             }
-        }
-
-        // 点击外部关闭下拉
-        MouseArea {
-            id: selectOverlay
-            visible: selectDropdown.visible
-            parent: settingsRoot
-            anchors.fill: parent
-            z: 99
-            onClicked: selectDropdown.visible = false
         }
     }
 }

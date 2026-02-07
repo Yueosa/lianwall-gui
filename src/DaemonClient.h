@@ -42,6 +42,15 @@ public:
     /// 设置自动重连开关
     void setAutoReconnect(bool enabled);
 
+    /// 重置启动尝试标志（允许再次自动启动 daemon）
+    void resetStartAttempt();
+
+    /// 重置重连退避延迟
+    void resetBackoff();
+
+    /// 尝试启动 daemon 进程
+    void tryStartDaemon();
+
     // ========================================================================
     // Query 请求
     // ========================================================================
@@ -108,12 +117,6 @@ private:
 
     /// 处理一行完整的 JSON 响应
     void processLine(const QByteArray &line);
-
-    /// 重置重连退避
-    void resetBackoff();
-
-    /// 尝试启动 daemon 进程（仅一次）
-    void tryStartDaemon();
 
     QLocalSocket *m_socket = nullptr;
     QString m_socketPath;

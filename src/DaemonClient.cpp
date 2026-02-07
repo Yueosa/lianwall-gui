@@ -243,6 +243,11 @@ void DaemonClient::resetBackoff()
     m_reconnectDelay = kMinReconnectDelay;
 }
 
+void DaemonClient::resetStartAttempt()
+{
+    m_daemonStartAttempted = false;
+}
+
 void DaemonClient::tryStartDaemon()
 {
     m_daemonStartAttempted = true;

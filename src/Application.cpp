@@ -131,7 +131,17 @@ void Application::initSystemTray()
     auto *restartAction = m_trayMenu->addAction(tr("🔄 重启 Daemon"));
     connect(restartAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Restart daemon requested";
-        runSystemdCommand(QStringLiteral("restart"));
+        if (m_daemonClient->isConnected()) {
+            m_daemonClient->shutdown([this](const Daemon::Response &) {
+                // shutdown 响应到达后立即重置并拉起新 daemon
+                m_daemonClient->resetStartAttempt();
+                m_daemonClient->resetBackoff();
+                // 短延迟后启动新 daemon（等旧进程释放 socket）
+                QTimer::singleShot(200, this, [this]() {
+                    m_daemonClient->tryStartDaemon();
+                });
+            });
+        }
     });
 
     m_trayMenu->addSeparator();
