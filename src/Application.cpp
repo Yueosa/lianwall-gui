@@ -25,7 +25,7 @@ using namespace LianwallGui;
 Application::Application(int &argc, char **argv)
     : QObject(nullptr)
     , m_app(new QApplication(argc, argv))
-    , m_engine(new QQmlApplicationEngine(this))
+    , m_engine(nullptr)
     , m_translator(nullptr)
     , m_daemonClient(nullptr)
     , m_daemonState(nullptr)
@@ -33,7 +33,7 @@ Application::Application(int &argc, char **argv)
     , m_trayIcon(nullptr)
     , m_trayMenu(nullptr)
 {
-    // 设置应用信息
+    // 设置应用信息（轻量级，单实例检测前即可完成）
     m_app->setApplicationName(APP_NAME);
     m_app->setApplicationVersion(APP_VERSION);
     m_app->setOrganizationName(APP_AUTHOR);
@@ -43,6 +43,11 @@ Application::Application(int &argc, char **argv)
 
     // 关闭窗口 ≠ 退出进程（托盘驻留）
     m_app->setQuitOnLastWindowClosed(false);
+}
+
+void Application::init()
+{
+    m_engine = new QQmlApplicationEngine(this);
 
     initComponents();
     initSystemTray();
@@ -88,19 +93,19 @@ void Application::initSystemTray()
     // --- 托盘菜单 ---
     m_trayMenu = new QMenu();
 
-    auto *showAction = m_trayMenu->addAction(tr("显示/隐藏"));
+    auto *showAction = m_trayMenu->addAction(tr("🌀 显示/隐藏"));
     connect(showAction, &QAction::triggered, this, &Application::toggleMainWindow);
 
     m_trayMenu->addSeparator();
 
-    auto *nextAction = m_trayMenu->addAction(tr("下一张"));
+    auto *nextAction = m_trayMenu->addAction(tr("▶️ 下一张"));
     connect(nextAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Next clicked, connected:" << m_daemonClient->isConnected();
         if (m_daemonClient->isConnected())
             m_daemonClient->next();
     });
 
-    auto *prevAction = m_trayMenu->addAction(tr("上一张"));
+    auto *prevAction = m_trayMenu->addAction(tr("◀️ 上一张"));
     connect(prevAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Prev clicked, connected:" << m_daemonClient->isConnected();
         if (m_daemonClient->isConnected())
@@ -123,14 +128,15 @@ void Application::initSystemTray()
 
     m_trayMenu->addSeparator();
 
-    auto *reloadAction = m_trayMenu->addAction(tr("重载配置"));
-    connect(reloadAction, &QAction::triggered, this, [this]() {
-        m_daemonClient->reloadConfig();
+    auto *restartAction = m_trayMenu->addAction(tr("🔄 重启 Daemon"));
+    connect(restartAction, &QAction::triggered, this, [this]() {
+        qDebug() << "[Tray] Restart daemon requested";
+        runSystemdCommand(QStringLiteral("restart"));
     });
 
     m_trayMenu->addSeparator();
 
-    auto *quitAction = m_trayMenu->addAction(tr("退出"));
+    auto *quitAction = m_trayMenu->addAction(tr("♥️ 退出"));
     connect(quitAction, &QAction::triggered, this, &Application::quit);
 
     // --- 托盘图标 ---

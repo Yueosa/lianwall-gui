@@ -358,8 +358,27 @@ void ConfigManager::openCurrentWallpaperDir()
 
 void ConfigManager::openDirectory(const QString &path)
 {
+    if (path.isEmpty())
+        return;
+
     QString dir = path;
     if (dir.startsWith("~/"))
         dir = QDir::homePath() + dir.mid(1);
+
+    // 目录不存在时自动创建
+    QDir d(dir);
+    if (!d.exists())
+        d.mkpath(".");
+
     QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+}
+
+QString ConfigManager::configDirPath() const
+{
+    return QDir::homePath() + QStringLiteral("/.config/lianwall");
+}
+
+QString ConfigManager::cacheDirPath() const
+{
+    return QDir::homePath() + QStringLiteral("/.cache/lianwall");
 }

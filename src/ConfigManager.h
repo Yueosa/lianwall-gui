@@ -119,6 +119,12 @@ public:
     /// 打开指定路径的目录
     Q_INVOKABLE void openDirectory(const QString &path);
 
+    /// 获取配置文件目录 (~/.config/lianwall)
+    Q_INVOKABLE QString configDirPath() const;
+
+    /// 获取缓存目录 (~/.cache/lianwall)
+    Q_INVOKABLE QString cacheDirPath() const;
+
 signals:
     // Daemon 配置
     void modeChanged();

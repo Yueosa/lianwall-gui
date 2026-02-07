@@ -126,6 +126,54 @@ Item {
                                 }
                             }
                         }
+
+                        // 配置文件目录
+                        ConfigRow {
+                            label: qsTr("配置目录")
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: App.Theme.spacingSmall
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: ConfigManager.configDirPath()
+                                    font.pixelSize: App.Theme.fontSizeSmall
+                                    font.family: "monospace"
+                                    color: App.Theme.text
+                                    elide: Text.ElideMiddle
+                                }
+
+                                SmallButton {
+                                    text: qsTr("📂 打开")
+                                    onClicked: ConfigManager.openDirectory(ConfigManager.configDirPath())
+                                }
+                            }
+                        }
+
+                        // 缓存目录
+                        ConfigRow {
+                            label: qsTr("缓存目录")
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: App.Theme.spacingSmall
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: ConfigManager.cacheDirPath()
+                                    font.pixelSize: App.Theme.fontSizeSmall
+                                    font.family: "monospace"
+                                    color: App.Theme.text
+                                    elide: Text.ElideMiddle
+                                }
+
+                                SmallButton {
+                                    text: qsTr("📂 打开")
+                                    onClicked: ConfigManager.openDirectory(ConfigManager.cacheDirPath())
+                                }
+                            }
+                        }
                     }
                 }
 

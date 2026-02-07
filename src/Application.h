@@ -28,6 +28,9 @@ public:
     explicit Application(int &argc, char **argv);
     ~Application();
 
+    /// 完整初始化（在单实例检测通过后调用）
+    void init();
+
     int exec();
 
     DaemonClient* daemonClient() const { return m_daemonClient; }

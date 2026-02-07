@@ -136,7 +136,7 @@ Item {
 
             // 刷新按钮
             Rectangle {
-                width: 36
+                implicitWidth: refreshRow.implicitWidth + 16
                 height: 36
                 radius: App.Theme.radiusMedium
                 color: refreshMouse.pressed ? App.Theme.cardHover
@@ -144,17 +144,29 @@ Item {
                 border.width: 1
                 border.color: App.Theme.border
 
-                Text {
-                    id: refreshIcon
+                Row {
+                    id: refreshRow
                     anchors.centerIn: parent
-                    text: "🔄"
-                    font.pixelSize: 16
+                    spacing: 4
 
-                    RotationAnimation on rotation {
-                        running: WallpaperModel.loading
-                        from: 0; to: 360
-                        duration: 1000
-                        loops: Animation.Infinite
+                    Text {
+                        id: refreshIcon
+                        text: "🔄"
+                        font.pixelSize: 16
+
+                        RotationAnimation on rotation {
+                            running: WallpaperModel.loading
+                            from: 0; to: 360
+                            duration: 1000
+                            loops: Animation.Infinite
+                        }
+                    }
+
+                    Text {
+                        text: qsTr("刷新")
+                        font.pixelSize: App.Theme.fontSizeSmall
+                        color: App.Theme.text
+                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
@@ -163,7 +175,10 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: WallpaperModel.load()
+                    onClicked: {
+                        LianwallApp.daemonReloadConfig()
+                        WallpaperModel.load()
+                    }
                 }
             }
         }
