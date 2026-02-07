@@ -18,6 +18,9 @@ QtObject {
     property string current: "lian"
     property bool isDark: current === "lian-dark"
     
+    // 主色调方案 - "blue" 或 "pink"
+    property string accentScheme: "pink"
+    
     // ========================================================================
     // 主题色 (不随主题变化)
     // ========================================================================
@@ -29,10 +32,10 @@ QtObject {
     // 语义化颜色
     // ========================================================================
     
-    // 强调色 - 用于按钮、链接、高亮
-    readonly property color accent: mtfBlue
-    readonly property color accentHover: Qt.lighter(mtfBlue, 1.1)
-    readonly property color accentPressed: Qt.darker(mtfBlue, 1.1)
+    // 强调色 - 根据 accentScheme 动态切换
+    readonly property color accent: accentScheme === "pink" ? mtfPink : mtfBlue
+    readonly property color accentHover: Qt.lighter(accent, 1.1)
+    readonly property color accentPressed: Qt.darker(accent, 1.1)
     
     // 主色 - 用于重要元素、选中状态
     readonly property color primary: mtfPink
@@ -98,8 +101,8 @@ QtObject {
     
     // 导航栏
     readonly property color navBar: isDark ? "#181825" : "#F5F5F5"
-    readonly property color navBarSelected: isDark ? Qt.rgba(mtfBlue.r, mtfBlue.g, mtfBlue.b, 0.2) 
-                                                   : Qt.rgba(mtfBlue.r, mtfBlue.g, mtfBlue.b, 0.15)
+    readonly property color navBarSelected: isDark ? Qt.rgba(accent.r, accent.g, accent.b, 0.2) 
+                                                   : Qt.rgba(accent.r, accent.g, accent.b, 0.15)
     
     // 滚动条
     readonly property color scrollbar: isDark ? "#45475A" : "#BDBDBD"

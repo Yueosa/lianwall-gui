@@ -59,6 +59,7 @@ class ConfigManager : public QObject
     // 本地 GUI 设置（QSettings）
     // ========================================================================
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY themeChanged)
+    Q_PROPERTY(QString accentColor READ accentColor WRITE setAccentColor NOTIFY accentColorChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
 
 public:
@@ -85,10 +86,12 @@ public:
 
     // --- 本地设置 Getters ---
     QString theme() const;
+    QString accentColor() const;
     QString language() const;
 
     // --- 本地设置 Setters ---
     Q_INVOKABLE void setTheme(const QString &theme);
+    Q_INVOKABLE void setAccentColor(const QString &accent);
     Q_INVOKABLE void setLanguage(const QString &lang);
 
     // ========================================================================
@@ -147,6 +150,7 @@ signals:
 
     // 本地设置
     void themeChanged(const QString &theme);
+    void accentColorChanged(const QString &accent);
     void languageChanged(const QString &lang);
 
     /// 配置操作错误

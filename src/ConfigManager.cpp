@@ -55,6 +55,21 @@ void ConfigManager::setTheme(const QString &theme)
     emit themeChanged(theme);
 }
 
+QString ConfigManager::accentColor() const
+{
+    QSettings settings;
+    return settings.value("app/accentColor", "blue").toString();
+}
+
+void ConfigManager::setAccentColor(const QString &accent)
+{
+    QSettings settings;
+    if (settings.value("app/accentColor").toString() == accent)
+        return;
+    settings.setValue("app/accentColor", accent);
+    emit accentColorChanged(accent);
+}
+
 QString ConfigManager::language() const
 {
     QSettings settings;

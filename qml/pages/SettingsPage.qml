@@ -207,30 +207,43 @@ Item {
                             }
                         }
 
+                        // 主色调
+                        ConfigRow {
+                            label: qsTr("主色调")
+
+                            RowLayout {
+                                spacing: App.Theme.spacingSmall
+
+                                ColorChip {
+                                    chipColor: "#5BCEFA"
+                                    label: qsTr("MTF蓝")
+                                    selected: ConfigManager.accentColor === "blue"
+                                    onClicked: ConfigManager.setAccentColor("blue")
+                                }
+                                ColorChip {
+                                    chipColor: "#F5A9B8"
+                                    label: qsTr("MTF粉")
+                                    selected: ConfigManager.accentColor === "pink"
+                                    onClicked: ConfigManager.setAccentColor("pink")
+                                }
+                            }
+                        }
+
                         // 语言
                         ConfigRow {
                             label: qsTr("语言")
 
-                            ComboBox {
+                            StyledSelect {
+                                id: langSelect
+                                selectWidth: 140
                                 model: [
                                     { text: "中文", value: "zh_CN" },
                                     { text: "English", value: "en" }
                                 ]
-                                textRole: "text"
-                                valueRole: "value"
                                 currentIndex: ConfigManager.language === "en" ? 1 : 0
-                                onActivated: {
-                                    ConfigManager.setLanguage(model[currentIndex].value)
-                                    LianwallApp.switchLanguage(model[currentIndex].value)
-                                }
-
-                                background: Rectangle {
-                                    radius: App.Theme.radiusSmall
-                                    color: App.Theme.surface
-                                    border.width: 1
-                                    border.color: App.Theme.border
-                                    implicitWidth: 140
-                                    implicitHeight: 32
+                                onSelected: function(index) {
+                                    ConfigManager.setLanguage(model[index].value)
+                                    LianwallApp.switchLanguage(model[index].value)
                                 }
                             }
                         }
@@ -375,6 +388,182 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: parent.clicked()
+        }
+    }
+
+    /// 色彩选择标签（带色点）
+    component ColorChip: Rectangle {
+        property color chipColor: "#5BCEFA"
+        property string label: ""
+        property bool selected: false
+        signal clicked()
+
+        width: colorChipRow.width + App.Theme.spacingSmall * 2
+        height: 32
+        radius: App.Theme.radiusMedium
+        color: selected ? Qt.rgba(chipColor.r, chipColor.g, chipColor.b, 0.25)
+               : colorChipMouse.containsMouse ? App.Theme.cardHover : "transparent"
+        border.width: selected ? 2 : 1
+        border.color: selected ? chipColor : App.Theme.border
+
+        Behavior on color { ColorAnimation { duration: 150 } }
+        Behavior on border.color { ColorAnimation { duration: 150 } }
+
+        Row {
+            id: colorChipRow
+            anchors.centerIn: parent
+            spacing: 6
+
+            Rectangle {
+                width: 14; height: 14
+                radius: 7
+                color: chipColor
+                anchors.verticalCenter: parent.verticalCenter
+                border.width: selected ? 2 : 0
+                border.color: Qt.darker(chipColor, 1.3)
+            }
+
+            Text {
+                text: label
+                font.pixelSize: App.Theme.fontSizeSmall
+                color: selected ? chipColor : App.Theme.text
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+
+        MouseArea {
+            id: colorChipMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: parent.clicked()
+        }
+    }
+
+    /// 自定义下拉选择器（替代默认 ComboBox）
+    component StyledSelect: Item {
+        id: selectRoot
+        property int selectWidth: 140
+        property var model: []
+        property int currentIndex: 0
+        signal selected(int index)
+
+        width: selectWidth
+        height: 32
+
+        // 当前选中项按钮
+        Rectangle {
+            id: selectButton
+            anchors.fill: parent
+            radius: App.Theme.radiusMedium
+            color: selectMouse.pressed ? App.Theme.cardHover
+                   : selectMouse.containsMouse ? App.Theme.surface : App.Theme.input
+            border.width: 1
+            border.color: selectDropdown.visible ? App.Theme.accent : App.Theme.border
+
+            Behavior on border.color { ColorAnimation { duration: 150 } }
+
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 8
+                spacing: 4
+
+                Text {
+                    width: parent.width - dropdownArrow.width - 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: selectRoot.model[selectRoot.currentIndex]?.text ?? ""
+                    font.pixelSize: App.Theme.fontSizeSmall
+                    color: App.Theme.text
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    id: dropdownArrow
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: selectDropdown.visible ? "▲" : "▼"
+                    font.pixelSize: 8
+                    color: App.Theme.textSecondary
+                }
+            }
+
+            MouseArea {
+                id: selectMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: selectDropdown.visible = !selectDropdown.visible
+            }
+        }
+
+        // 下拉面板
+        Rectangle {
+            id: selectDropdown
+            visible: false
+            y: selectButton.height + 4
+            width: selectRoot.selectWidth
+            height: dropdownCol.height + 8
+            radius: App.Theme.radiusMedium
+            color: App.Theme.popup
+            border.width: 1
+            border.color: App.Theme.border
+            z: 100
+
+            // 阴影效果
+            layer.enabled: true
+            layer.effect: Item {}  // 简单 z 提升
+
+            Column {
+                id: dropdownCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 4
+
+                Repeater {
+                    model: selectRoot.model
+
+                    Rectangle {
+                        width: dropdownCol.width
+                        height: 32
+                        radius: App.Theme.radiusSmall
+                        color: index === selectRoot.currentIndex ? App.Theme.accent
+                               : optMouse.containsMouse ? App.Theme.cardHover : "transparent"
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            text: modelData.text
+                            font.pixelSize: App.Theme.fontSizeSmall
+                            color: index === selectRoot.currentIndex ? App.Theme.textOnAccent
+                                   : App.Theme.text
+                        }
+
+                        MouseArea {
+                            id: optMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                selectRoot.currentIndex = index
+                                selectRoot.selected(index)
+                                selectDropdown.visible = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 点击外部关闭下拉
+        MouseArea {
+            id: selectOverlay
+            visible: selectDropdown.visible
+            parent: settingsRoot
+            anchors.fill: parent
+            z: 99
+            onClicked: selectDropdown.visible = false
         }
     }
 }

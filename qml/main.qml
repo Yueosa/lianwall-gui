@@ -29,12 +29,16 @@ ApplicationWindow {
     // 主题初始化
     Component.onCompleted: {
         App.Theme.current = ConfigManager.theme
+        App.Theme.accentScheme = ConfigManager.accentColor
     }
 
     Connections {
         target: ConfigManager
         function onThemeChanged(newTheme) {
             App.Theme.current = newTheme
+        }
+        function onAccentColorChanged(newAccent) {
+            App.Theme.accentScheme = newAccent
         }
     }
 
