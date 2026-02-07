@@ -105,14 +105,17 @@ inline QString eventTypeToString(EventType e) {
 }
 
 inline EventType eventTypeFromString(const QString &s) {
-    if (s == QLatin1String("wallpaper_changed"))   return EventType::WallpaperChanged;
-    if (s == QLatin1String("status_changed"))      return EventType::StatusChanged;
-    if (s == QLatin1String("config_changed"))      return EventType::ConfigChanged;
-    if (s == QLatin1String("space_updated"))       return EventType::SpaceUpdated;
-    if (s == QLatin1String("vram_changed"))        return EventType::VramChanged;
-    if (s == QLatin1String("time_point_reached"))  return EventType::TimePointReached;
-    if (s == QLatin1String("scan_progress"))       return EventType::ScanProgress;
-    if (s == QLatin1String("error"))               return EventType::Error;
+    // 同时支持蛇形命名 (Subscribe 请求) 和驼峰命名 (Event 推送)
+    if (s == QLatin1String("wallpaper_changed") || s == QLatin1String("WallpaperChanged"))   return EventType::WallpaperChanged;
+    if (s == QLatin1String("status_changed")    || s == QLatin1String("StatusChanged"))      return EventType::StatusChanged;
+    if (s == QLatin1String("config_changed")    || s == QLatin1String("ConfigChanged"))      return EventType::ConfigChanged;
+    if (s == QLatin1String("space_updated")     || s == QLatin1String("SpaceUpdated"))       return EventType::SpaceUpdated;
+    if (s == QLatin1String("vram_changed")      || s == QLatin1String("VramChanged"))        return EventType::VramChanged;
+    if (s == QLatin1String("time_point_reached") || s == QLatin1String("TimePointReached"))  return EventType::TimePointReached;
+    if (s == QLatin1String("scan_progress")     || s == QLatin1String("ScanProgress"))       return EventType::ScanProgress;
+    if (s == QLatin1String("error")             || s == QLatin1String("Error"))               return EventType::Error;
+    if (s == QLatin1String("all")               || s == QLatin1String("All"))                 return EventType::All;
+    qWarning() << "[DaemonTypes] Unknown event type:" << s;
     return EventType::All;
 }
 

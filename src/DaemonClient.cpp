@@ -201,10 +201,15 @@ void DaemonClient::processLine(const QByteArray &line)
     }
 
     const auto &r = *resp;
+    qDebug() << "[DaemonClient] Received type:" << static_cast<int>(r.type)
+             << "pending:" << m_pendingCallbacks.size()
+             << "expectSync:" << m_expectingImmediateStatus;
 
     // 事件推送（不消耗 pending callback）
     if (r.type == Daemon::ResponseType::Event) {
         auto event = r.asEvent();
+        qDebug() << "[DaemonClient] Event:" << static_cast<int>(event.type)
+                 << "raw:" << event.rawData;
         emit eventReceived(event);
         return;
     }

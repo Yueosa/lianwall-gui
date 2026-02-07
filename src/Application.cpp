@@ -108,16 +108,17 @@ void Application::initSystemTray()
 
     m_trayMenu->addSeparator();
 
-    // 模式切换
-    auto *modeMenu = m_trayMenu->addMenu(tr("切换模式"));
-    auto *videoModeAction = modeMenu->addAction(tr("🎬 动态壁纸 (Video)"));
-    connect(videoModeAction, &QAction::triggered, this, [this]() {
-        daemonSetMode("Video");
+    // 模式切换（单按键切换）
+    m_trayModeAction = m_trayMenu->addAction(tr("切换模式"));
+    updateTrayModeAction();
+    connect(m_trayModeAction, &QAction::triggered, this, [this]() {
+        auto current = m_daemonState->mode();
+        auto target = (current == QStringLiteral("Video")) ? QStringLiteral("Image") : QStringLiteral("Video");
+        qDebug() << "[Tray] Toggle mode:" << current << "->" << target;
+        daemonSetMode(target);
     });
-    auto *imageModeAction = modeMenu->addAction(tr("🖼️ 静态壁纸 (Image)"));
-    connect(imageModeAction, &QAction::triggered, this, [this]() {
-        daemonSetMode("Image");
-    });
+    // DaemonState mode 变化时更新托盘文字
+    connect(m_daemonState, &DaemonState::modeChanged, this, &Application::updateTrayModeAction);
 
     m_trayMenu->addSeparator();
 

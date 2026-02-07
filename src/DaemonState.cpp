@@ -54,6 +54,8 @@ void DaemonState::onInitialStatus(const Daemon::StatusPayload &status)
 
 void DaemonState::onEvent(const Daemon::DaemonEvent &event)
 {
+    qDebug() << "[DaemonState] onEvent type:" << static_cast<int>(event.type);
+
     switch (event.type) {
 
     case Daemon::EventType::WallpaperChanged: {
