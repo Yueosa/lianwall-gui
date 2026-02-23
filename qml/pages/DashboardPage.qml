@@ -77,7 +77,7 @@ Item {
                                     // 图片用 fragment(#) 强制刷新，不影响 file:// 路径解析
                                     return "file://" + p + "#" + n
                                 }
-                                fillMode: Image.PreserveAspectCrop
+                                fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 cache: false
                             }
