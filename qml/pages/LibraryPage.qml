@@ -181,6 +181,7 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
+                        LianwallApp.daemonReloadConfig()
                         WallpaperModel.load()
                     }
                 }
