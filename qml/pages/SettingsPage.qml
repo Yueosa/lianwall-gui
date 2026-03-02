@@ -436,7 +436,8 @@ Item {
                                 ]
                                 currentIndex: ConfigManager.vramBackend === "custom" ? 1 : 0
                                 enabled: DaemonState.daemonConnected && ConfigManager.vramEnabled
-                                onActivated: function(idx) {
+                                onSelected: function(idx) {
+                                    console.log("Selected backend:", model[idx].value);
                                     ConfigManager.setVramBackend(model[idx].value)
                                 }
                             }
