@@ -4,6 +4,7 @@
 
 | 版本 | 日期 | 主要变化 |
 |------|------|----------|
+| [1.4.1](changelogs/CHANGELOG-1.4.1.md) | 2026-03-03 | 修复 VRAM 后端下拉框静默无效、Library 页图片圆角遮挡 |
 | [1.4.0](changelogs/CHANGELOG-1.4.0.md) | 2026-02-26 | VRAM 后端选择器 + 自定义命令输入框（配套 lianwall 5.3.0） |
 | [1.3.0](changelogs/CHANGELOG-1.3.0.md) | 2026-02-23 | Daemon 命令错误回调、错误弹窗、预览占位精细化、预览框高度修复 |
 | [1.2.0](changelogs/CHANGELOG-1.2.0.md) | 2026-02-23 | 完整设置页、i18n 补全、DaemonClient/模型层大量 bug 修复 |
