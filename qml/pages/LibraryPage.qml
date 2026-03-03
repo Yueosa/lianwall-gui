@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import ".." as App
 import "../dialogs" as Dialogs
 
@@ -313,6 +314,14 @@ Item {
                     height: wallpaperGrid.cellHeight
 
                     Rectangle {
+                        id: cardMask
+                        anchors.fill: thumbCard
+                        radius: thumbCard.radius
+                        visible: false
+                        layer.enabled: true
+                    }
+
+                    Rectangle {
                         id: thumbCard
                         anchors.fill: parent
                         anchors.margins: 4
@@ -320,7 +329,12 @@ Item {
                         color: thumbMouse.containsMouse ? App.Theme.cardHover : App.Theme.card
                         border.width: wallpaperIsCurrent ? 2 : 1
                         border.color: wallpaperIsCurrent ? App.Theme.accent : App.Theme.border
-                        clip: true
+                    
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: cardMask
+                        }
 
                         Behavior on color {
                             ColorAnimation { duration: 150 }
