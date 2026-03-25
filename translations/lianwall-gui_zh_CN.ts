@@ -317,8 +317,8 @@
     </message>
     <message>
         <location filename="../qml/pages/SettingsPage.qml" line="393"/>
-        <source>swww 参数</source>
-        <translation>swww 参数</translation>
+        <source>awww 参数</source>
+        <translation>awww 参数</translation>
     </message>
     <message>
         <location filename="../qml/pages/SettingsPage.qml" line="418"/>
