@@ -390,7 +390,7 @@ Item {
                         }
 
                         ConfigRow {
-                            label: qsTr("swww 参数")
+                            label: qsTr("awww 参数")
 
                             Components.TagEditor {
                                 Layout.fillWidth: true
