@@ -11,6 +11,7 @@
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
+#include <QSet>
 #include <QString>
 #include <QVector>
 
@@ -32,6 +33,9 @@ class WallpaperListModel : public QAbstractListModel
 
     /// 壁纸总数
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+
+    /// 缩略图刷新令牌（用于 QML cache-busting）
+    Q_PROPERTY(int refreshToken READ refreshToken NOTIFY refreshTokenChanged)
 
 public:
     enum Roles {
@@ -56,6 +60,7 @@ public:
     QString mode() const { return m_mode; }
     bool loading() const { return m_loading; }
     int count() const { return m_items.size(); }
+    int refreshToken() const { return m_refreshToken; }
 
     // --- QML 可调用 ---
 
@@ -93,6 +98,7 @@ signals:
     void modeChanged();
     void loadingChanged();
     void countChanged();
+    void refreshTokenChanged();
 
     /// 操作错误
     void errorOccurred(const QString &message);
@@ -102,6 +108,9 @@ private:
     QVector<Daemon::WallpaperPoint> m_items;
     QString m_mode;
     bool m_loading = false;
+    int m_refreshToken = 0;
+    QSet<QString> m_pendingLockPaths;
+    QSet<QString> m_pendingSetPaths;
 };
 
 // ============================================================================

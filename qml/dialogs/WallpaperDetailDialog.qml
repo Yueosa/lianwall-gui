@@ -81,9 +81,11 @@ Dialog {
                 source: {
                     if (!detailDialog.wallpaperPath) return ""
                     if (detailDialog.wallpaperIsVideo) {
-                        return "image://thumbnail/" + encodeURIComponent(detailDialog.wallpaperPath)
+                        return "image://thumbnail/"
+                               + encodeURIComponent(detailDialog.wallpaperPath)
+                               + "?t=" + WallpaperModel.refreshToken
                     }
-                    return "file://" + detailDialog.wallpaperPath
+                    return "file://" + detailDialog.wallpaperPath + "#" + WallpaperModel.refreshToken
                 }
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true

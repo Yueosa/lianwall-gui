@@ -4,7 +4,7 @@
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![Version](https://img.shields.io/badge/version-1.4.3-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
 [![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
 [![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
@@ -99,7 +99,7 @@ lianwall-gui
 |------|------|
 | **🏠 仪表盘** | 当前壁纸预览 + 状态信息 + 快捷操作 + 倒计时进度条 + 显存监控 |
 | **📚 壁纸库** | 网格视图浏览壁纸，搜索筛选（全部/已锁定/未锁定），点击查看详情 |
-| **⚙️ 设置** | 路径与模式、动态壁纸引擎(mpvpaper)、静态壁纸引擎(swww)、显存监控(VRAM 含自定义后端)、守护进程、界面设置 |
+| **⚙️ 设置** | 路径与模式、动态壁纸引擎(mpvpaper)、静态壁纸引擎(awww)、显存监控(VRAM 含自定义后端)、守护进程、界面设置 |
 | **ℹ️ 关于** | 版本信息、源代码链接、主题色说明 |
 
 ---

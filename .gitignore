@@ -10,3 +10,6 @@ scripts/
 # bug列表
 BUGS.md
 TODO.md
+
+# 本地发布草稿
+RELEASE-*.md

@@ -71,6 +71,7 @@ private:
     void loadTranslations();
     void doFinalQuit();
     void updateTrayModeAction();
+    void finishWallpaperCommand();
 
     // 托盘图标点击处理
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
@@ -93,4 +94,6 @@ private:
     QSystemTrayIcon *m_trayIcon;
     QMenu *m_trayMenu;
     QAction *m_trayModeAction = nullptr;
+    bool m_wallpaperCommandInFlight = false;
+    bool m_lockCommandInFlight = false;
 };

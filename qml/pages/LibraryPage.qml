@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import ".." as App
 import "../dialogs" as Dialogs
 
@@ -299,6 +298,7 @@ Item {
                 anchors.fill: parent
                 visible: WallpaperFilterModel.count > 0
                 clip: true
+                cacheBuffer: cellHeight * 4
 
                 cellWidth: {
                     // 自适应列数：最少 2 列，每列最小 160px
@@ -314,14 +314,6 @@ Item {
                     height: wallpaperGrid.cellHeight
 
                     Rectangle {
-                        id: cardMask
-                        anchors.fill: thumbCard
-                        radius: thumbCard.radius
-                        visible: false
-                        layer.enabled: true
-                    }
-
-                    Rectangle {
                         id: thumbCard
                         anchors.fill: parent
                         anchors.margins: 4
@@ -329,12 +321,6 @@ Item {
                         color: thumbMouse.containsMouse ? App.Theme.cardHover : App.Theme.card
                         border.width: wallpaperIsCurrent ? 2 : 1
                         border.color: wallpaperIsCurrent ? App.Theme.accent : App.Theme.border
-                    
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: cardMask
-                        }
 
                         Behavior on color {
                             ColorAnimation { duration: 150 }
@@ -345,19 +331,25 @@ Item {
                             spacing: 0
 
                             // 缩略图区域
-                            Item {
+                            Rectangle {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
+                                radius: thumbCard.radius
+                                color: App.Theme.surface
+                                clip: true
 
                                 Image {
                                     id: thumbImage
                                     anchors.fill: parent
-                                    anchors.margins: 1
+                                    sourceSize.width: Math.max(1, Math.ceil(width))
+                                    sourceSize.height: Math.max(1, Math.ceil(height))
                                     source: {
                                         if (wallpaperIsVideo) {
-                                            return "image://thumbnail/" + encodeURIComponent(wallpaperPath)
+                                            return "image://thumbnail/"
+                                                   + encodeURIComponent(wallpaperPath)
+                                                   + "?t=" + WallpaperModel.refreshToken
                                         }
-                                        return "image://thumbnail/" + encodeURIComponent(wallpaperPath)
+                                        return "file://" + wallpaperPath + "#" + WallpaperModel.refreshToken
                                     }
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
@@ -380,7 +372,7 @@ Item {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.bottomMargin: 4
                                             width: 16; height: 16
-                                            running: thumbImage.status === Image.Loading
+                                            running: wallpaperIsVideo && thumbImage.status === Image.Loading
                                             visible: running
                                         }
                                     }

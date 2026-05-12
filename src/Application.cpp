@@ -342,42 +342,70 @@ void Application::doFinalQuit()
 // QML 可调用的 Daemon 命令
 // ============================================================================
 
+void Application::finishWallpaperCommand()
+{
+    m_wallpaperCommandInFlight = false;
+}
+
 void Application::daemonNext()
 {
     qDebug() << "[Application] daemonNext() called, connected:" << m_daemonClient->isConnected();
-    if (m_daemonClient->isConnected())
-        m_daemonClient->next([this](const Daemon::Response &r) {
-            if (r.type == Daemon::ResponseType::Error) {
-                auto err = r.asError();
-                qWarning() << "[Application] Next failed:" << err.message;
-                emit m_daemonState->daemonError(
-                    Daemon::errorCodeToString(err.code), err.message, true);
-            }
-        });
+    if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
+        return;
+
+    m_wallpaperCommandInFlight = true;
+    m_daemonClient->next([this](const Daemon::Response &r) {
+        finishWallpaperCommand();
+
+        if (r.type == Daemon::ResponseType::Error) {
+            auto err = r.asError();
+            qWarning() << "[Application] Next failed:" << err.message;
+            emit m_daemonState->daemonError(
+                Daemon::errorCodeToString(err.code), err.message, true);
+        }
+    });
 }
 
 void Application::daemonPrev()
 {
     qDebug() << "[Application] daemonPrev() called, connected:" << m_daemonClient->isConnected();
-    if (m_daemonClient->isConnected())
-        m_daemonClient->prev([this](const Daemon::Response &r) {
-            if (r.type == Daemon::ResponseType::Error) {
-                auto err = r.asError();
-                qWarning() << "[Application] Prev failed:" << err.message;
-                emit m_daemonState->daemonError(
-                    Daemon::errorCodeToString(err.code), err.message, true);
-            }
-        });
+    if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
+        return;
+
+    m_wallpaperCommandInFlight = true;
+    m_daemonClient->prev([this](const Daemon::Response &r) {
+        finishWallpaperCommand();
+
+        if (r.type == Daemon::ResponseType::Error) {
+            auto err = r.asError();
+            qWarning() << "[Application] Prev failed:" << err.message;
+            emit m_daemonState->daemonError(
+                Daemon::errorCodeToString(err.code), err.message, true);
+        }
+    });
 }
 
 void Application::daemonToggleLock()
 {
-    if (m_daemonClient->isConnected()) {
-        auto path = m_daemonState->currentPath();
-        qDebug() << "[Application] daemonToggleLock() path:" << path;
-        if (!path.isEmpty())
-            m_daemonClient->toggleLock(path);
-    }
+    if (!m_daemonClient->isConnected() || m_lockCommandInFlight)
+        return;
+
+    auto path = m_daemonState->currentPath();
+    qDebug() << "[Application] daemonToggleLock() path:" << path;
+    if (path.isEmpty())
+        return;
+
+    m_lockCommandInFlight = true;
+    m_daemonClient->toggleLock(path, [this](const Daemon::Response &r) {
+        m_lockCommandInFlight = false;
+
+        if (r.type == Daemon::ResponseType::Error) {
+            auto err = r.asError();
+            qWarning() << "[Application] ToggleLock failed:" << err.message;
+            emit m_daemonState->daemonError(
+                Daemon::errorCodeToString(err.code), err.message, true);
+        }
+    });
 }
 
 void Application::daemonRescan()
@@ -398,17 +426,21 @@ void Application::daemonSetMode(const QString &mode)
 {
     qDebug() << "[Application] daemonSetMode() called, mode:" << mode
              << "connected:" << m_daemonClient->isConnected();
-    if (m_daemonClient->isConnected()) {
-        auto m = Daemon::wallModeFromString(mode);
-        m_daemonClient->setMode(m, [this](const Daemon::Response &r) {
-            if (r.type == Daemon::ResponseType::Error) {
-                auto err = r.asError();
-                qWarning() << "[Application] SetMode failed:" << err.message;
-                emit m_daemonState->daemonError(
-                    Daemon::errorCodeToString(err.code), err.message, true);
-            }
-        });
-    }
+    if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
+        return;
+
+    auto m = Daemon::wallModeFromString(mode);
+    m_wallpaperCommandInFlight = true;
+    m_daemonClient->setMode(m, [this](const Daemon::Response &r) {
+        finishWallpaperCommand();
+
+        if (r.type == Daemon::ResponseType::Error) {
+            auto err = r.asError();
+            qWarning() << "[Application] SetMode failed:" << err.message;
+            emit m_daemonState->daemonError(
+                Daemon::errorCodeToString(err.code), err.message, true);
+        }
+    });
 }
 
 void Application::runSystemdCommand(const QString &action)

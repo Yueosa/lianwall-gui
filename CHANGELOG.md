@@ -4,6 +4,7 @@
 
 | 版本 | 日期 | 主要变化 |
 |------|------|----------|
+| [1.4.3](changelogs/CHANGELOG-1.4.3.md) | 2026-05-13 | 壁纸库刷新令牌、空洞修复、图片加载优化、GUI 命令防连点 |
 | [1.4.2](changelogs/CHANGELOG-1.4.2.md) | 2026-03-25 | 适配 awww 引擎，更新设置页显示文本 |
 | [1.4.1](changelogs/CHANGELOG-1.4.1.md) | 2026-03-03 | 修复 VRAM 后端下拉框静默无效、Library 页图片圆角遮挡 |
 | [1.4.0](changelogs/CHANGELOG-1.4.0.md) | 2026-02-26 | VRAM 后端选择器 + 自定义命令输入框（配套 lianwall 5.3.0） |

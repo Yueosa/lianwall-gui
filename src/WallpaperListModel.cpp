@@ -86,6 +86,9 @@ void WallpaperListModel::load(const QString &mode)
             m_items = space.items;
             endResetModel();
 
+            ++m_refreshToken;
+            emit refreshTokenChanged();
+
             m_mode = Daemon::wallModeToString(space.mode);
             emit modeChanged();
             emit countChanged();
@@ -108,9 +111,15 @@ void WallpaperListModel::toggleLock(int row)
         return;
 
     const auto path = m_items.at(row).path;
+    if (m_pendingLockPaths.contains(path))
+        return;
+
+    m_pendingLockPaths.insert(path);
     qDebug() << "[WallpaperListModel] ToggleLock:" << m_items.at(row).filename;
 
     m_client->toggleLock(path, [this, path](const Daemon::Response &resp) {
+        m_pendingLockPaths.remove(path);
+
         if (resp.type == Daemon::ResponseType::Ok) {
             // 按 path 查找（列表可能已被 load() 重置，row 不再可靠）
             for (int i = 0; i < m_items.size(); ++i) {
@@ -135,9 +144,15 @@ void WallpaperListModel::setAsCurrent(int row)
         return;
 
     const auto &item = m_items.at(row);
+    if (m_pendingSetPaths.contains(item.path))
+        return;
+
+    m_pendingSetPaths.insert(item.path);
     qDebug() << "[WallpaperListModel] SetWallpaper:" << item.path;
 
-    m_client->setWallpaper(item.path, [this](const Daemon::Response &resp) {
+    m_client->setWallpaper(item.path, [this, path = item.path](const Daemon::Response &resp) {
+        m_pendingSetPaths.remove(path);
+
         if (resp.type == Daemon::ResponseType::Error) {
             auto err = resp.asError();
             qWarning() << "[WallpaperListModel] SetWallpaper error:" << err.message;
