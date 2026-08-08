@@ -15,6 +15,8 @@
 #include <QSystemTrayIcon>
 #include <QMenu>
 
+#include "DaemonTypes.h"
+
 class DaemonClient;
 class DaemonState;
 class ConfigManager;
@@ -23,6 +25,9 @@ class WallpaperFilterModel;
 
 class Application : public QObject {
     Q_OBJECT
+
+    /// 壁纸/模式切换进行中（点击后为 true，成功事件或真实错误后清除）
+    Q_PROPERTY(bool wallpaperSwitching READ wallpaperSwitching NOTIFY wallpaperSwitchingChanged)
 
 public:
     explicit Application(int &argc, char **argv);
@@ -36,6 +41,7 @@ public:
     DaemonClient* daemonClient() const { return m_daemonClient; }
     DaemonState*  daemonState()  const { return m_daemonState; }
     ConfigManager* configManager() const { return m_configManager; }
+    bool wallpaperSwitching() const { return m_wallpaperCommandInFlight; }
 
 public slots:
     /// 显示主窗口（从托盘恢复）
@@ -63,6 +69,7 @@ public slots:
 
 signals:
     void aboutToQuit();
+    void wallpaperSwitchingChanged();
 
 private:
     void initComponents();
@@ -72,6 +79,8 @@ private:
     void doFinalQuit();
     void updateTrayModeAction();
     void finishWallpaperCommand();
+    void armWallpaperCommandGuard();
+    void handleWallpaperCommandResponse(const Daemon::Response &r, const char *op);
 
     // 托盘图标点击处理
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);

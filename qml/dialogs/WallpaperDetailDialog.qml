@@ -78,15 +78,13 @@ Dialog {
             Image {
                 id: detailPreview
                 anchors.fill: parent
-                source: {
-                    if (!detailDialog.wallpaperPath) return ""
-                    if (detailDialog.wallpaperIsVideo) {
-                        return "image://thumbnail/"
-                               + encodeURIComponent(detailDialog.wallpaperPath)
-                               + "?t=" + WallpaperModel.refreshToken
-                    }
-                    return "file://" + detailDialog.wallpaperPath + "#" + WallpaperModel.refreshToken
-                }
+                sourceSize.width: 1280
+                sourceSize.height: 720
+                source: detailDialog.wallpaperPath
+                        ? ("image://thumbnail/"
+                           + encodeURIComponent(detailDialog.wallpaperPath)
+                           + "?t=" + WallpaperModel.refreshToken)
+                        : ""
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 cache: false

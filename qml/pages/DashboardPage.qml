@@ -21,20 +21,25 @@ Item {
         return ["mp4","mkv","webm","avi","mov","flv","wmv","m4v","3gp","ogv","ts","m2ts"].indexOf(ext) >= 0
     }
 
-    ScrollView {
+    Flickable {
+        id: dashFlick
         anchors.fill: parent
-        contentWidth: availableWidth
+        clip: true
+        contentWidth: width
+        contentHeight: mainCol.height + App.Theme.spacingLarge * 2
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
 
-        Flickable {
-            contentHeight: mainCol.height + App.Theme.spacingLarge * 2
+        ScrollBar.vertical: Components.StyledScrollBar {}
 
-            ColumnLayout {
-                id: mainCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: App.Theme.spacingLarge
-                spacing: App.Theme.spacingLarge
+        ColumnLayout {
+            id: mainCol
+            width: dashFlick.width
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: App.Theme.spacingLarge
+            spacing: App.Theme.spacingLarge
 
                 // ============================================================
                 // 壁纸预览卡片
@@ -67,26 +72,49 @@ Item {
                             Image {
                                 id: previewImage
                                 anchors.fill: parent
+                                sourceSize.width: 1280
+                                sourceSize.height: 720
                                 source: {
                                     var p = DaemonState.currentPath
                                     if (!p || p.length === 0) return ""
-                                    var n = dashRoot.refreshCounter
-                                    if (dashRoot.isVideo) {
-                                        return "image://thumbnail/" + encodeURIComponent(p) + "?t=" + n
-                                    }
-                                    // 图片用 fragment(#) 强制刷新，不影响 file:// 路径解析
-                                    return "file://" + p + "#" + n
+                                    return "image://thumbnail/" + encodeURIComponent(p)
+                                           + "?t=" + dashRoot.refreshCounter
                                 }
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 cache: false
                             }
 
+                            // 切换中遮罩（业务进行中，不以 IPC 超时为准）
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Qt.rgba(0, 0, 0, 0.35)
+                                visible: LianwallApp.wallpaperSwitching
+                                z: 2
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: App.Theme.spacingSmall
+
+                                    BusyIndicator {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        running: LianwallApp.wallpaperSwitching
+                                        width: 36; height: 36
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: qsTr("正在切换壁纸…")
+                                        font.pixelSize: App.Theme.fontSizeMedium
+                                        color: "white"
+                                    }
+                                }
+                            }
+
                             // 无壁纸 / 加载中 / 错误占位
                             ColumnLayout {
                                 anchors.centerIn: parent
                                 spacing: App.Theme.spacingSmall
-                                visible: previewImage.status !== Image.Ready
+                                visible: previewImage.status !== Image.Ready && !LianwallApp.wallpaperSwitching
 
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
@@ -179,20 +207,25 @@ Item {
 
                         ActionButton {
                             icon: "⏮️"
-                            label: qsTr("上一张")
+                            label: LianwallApp.wallpaperSwitching ? qsTr("切换中…") : qsTr("上一张")
+                            enabled: !LianwallApp.wallpaperSwitching
                             onClicked: LianwallApp.daemonPrev()
                         }
 
                         ActionButton {
                             icon: "⏭️"
-                            label: qsTr("下一张")
+                            label: LianwallApp.wallpaperSwitching ? qsTr("切换中…") : qsTr("下一张")
                             highlighted: true
+                            enabled: !LianwallApp.wallpaperSwitching
                             onClicked: LianwallApp.daemonNext()
                         }
 
                         ActionButton {
                             icon: DaemonState.mode === "Video" ? "🖼️" : "🎬"
-                            label: DaemonState.mode === "Video" ? qsTr("切到图片") : qsTr("切到视频")
+                            label: LianwallApp.wallpaperSwitching
+                                   ? qsTr("切换中…")
+                                   : (DaemonState.mode === "Video" ? qsTr("切到图片") : qsTr("切到视频"))
+                            enabled: !LianwallApp.wallpaperSwitching
                             onClicked: {
                                 var target = DaemonState.mode === "Video" ? "Image" : "Video"
                                 console.log("[Dashboard] Switch mode:", DaemonState.mode, "->", target)
@@ -323,9 +356,8 @@ Item {
                     }
                 }
 
-                // 底部间距
-                Item { Layout.preferredHeight: App.Theme.spacingMedium }
-            }
+            // 底部间距
+            Item { Layout.preferredHeight: App.Theme.spacingMedium }
         }
     }
 
@@ -351,20 +383,24 @@ Item {
         property string icon: ""
         property string label: ""
         property bool highlighted: false
+        property bool enabled: true
         signal clicked()
 
         Layout.fillWidth: true
         implicitHeight: 56
+        opacity: enabled ? 1.0 : 0.55
 
         Rectangle {
             anchors.fill: parent
             radius: App.Theme.radiusMedium
-            color: actionMouse.pressed
-                   ? (highlighted ? App.Theme.accentPressed : App.Theme.cardHover)
-                   : actionMouse.containsMouse
-                     ? (highlighted ? App.Theme.accentHover : App.Theme.cardHover)
-                     : highlighted ? App.Theme.accent : "transparent"
-            border.width: highlighted ? 0 : 1
+            color: !enabled
+                   ? App.Theme.surface
+                   : actionMouse.pressed
+                     ? (highlighted ? App.Theme.accentPressed : App.Theme.cardHover)
+                     : actionMouse.containsMouse
+                       ? (highlighted ? App.Theme.accentHover : App.Theme.cardHover)
+                       : highlighted ? App.Theme.accent : "transparent"
+            border.width: highlighted && enabled ? 0 : 1
             border.color: App.Theme.border
 
             Behavior on color {
@@ -384,15 +420,16 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                     text: label
                     font.pixelSize: App.Theme.fontSizeSmall
-                    color: highlighted ? App.Theme.textOnAccent : App.Theme.text
+                    color: (highlighted && enabled) ? App.Theme.textOnAccent : App.Theme.text
                 }
             }
 
             MouseArea {
                 id: actionMouse
                 anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                hoverEnabled: enabled
+                enabled: parent.parent.enabled
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.BusyCursor
                 onClicked: parent.parent.clicked()
             }
         }

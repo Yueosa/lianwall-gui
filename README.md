@@ -4,7 +4,7 @@
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-[![Version](https://img.shields.io/badge/version-1.4.3-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![Version](https://img.shields.io/badge/version-1.4.4-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
 [![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
 [![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
@@ -67,7 +67,7 @@ sudo cmake --install build
 |----|------|
 | Qt 6 (Core, Gui, Widgets, Quick, QuickControls2, Network) | GUI 框架 |
 | ffmpeg | 视频缩略图提取 |
-| [lianwall](https://github.com/Yueosa/lianwall) ≥ 5.3.0 | 守护进程 (lianwalld) |
+| [lianwall](https://github.com/Yueosa/lianwall) ≥ 5.5.1 | 守护进程 (lianwalld) |
 
 #### 编译依赖
 

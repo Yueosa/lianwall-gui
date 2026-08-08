@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lianwall-gui VERSION 1.4.3 LANGUAGES CXX)
+project(lianwall-gui VERSION 1.4.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -71,6 +71,7 @@ qt_add_qml_module(lianwall-gui
         qml/components/NavBar.qml
         qml/components/CountdownBar.qml
         qml/components/TagEditor.qml
+        qml/components/StyledScrollBar.qml
         qml/pages/PlaceholderPage.qml
         qml/pages/AboutPage.qml
         qml/pages/DashboardPage.qml

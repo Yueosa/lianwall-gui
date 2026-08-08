@@ -2,29 +2,34 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".." as App
+import "../components" as Components
 
 /// 关于页面
 /// Logo + 版本 + 双仓库链接 + 主题色声明
 Item {
     id: aboutRoot
 
-    ScrollView {
+    Flickable {
+        id: aboutFlick
         anchors.fill: parent
-        contentWidth: availableWidth
+        clip: true
+        contentWidth: width
+        contentHeight: aboutColumn.height + App.Theme.spacingLarge * 4
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
 
-        Flickable {
-            contentHeight: aboutColumn.height + App.Theme.spacingLarge * 2
+        ScrollBar.vertical: Components.StyledScrollBar {}
 
-            ColumnLayout {
-                id: aboutColumn
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.topMargin: App.Theme.spacingLarge * 2
-                width: Math.min(parent.width - App.Theme.spacingLarge * 2, 480)
-                spacing: App.Theme.spacingLarge
+        ColumnLayout {
+            id: aboutColumn
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: App.Theme.spacingLarge * 2
+            width: Math.min(aboutFlick.width - App.Theme.spacingLarge * 2, 480)
+            spacing: App.Theme.spacingLarge
 
-                // Logo
-                Image {
+            // Logo
+            Image {
                     Layout.alignment: Qt.AlignHCenter
                     source: "qrc:/icons/lianwall.png"
                     sourceSize: Qt.size(96, 96)
@@ -151,9 +156,8 @@ Item {
                     }
                 }
 
-                // 底部间距
-                Item { Layout.preferredHeight: App.Theme.spacingLarge }
-            }
+            // 底部间距
+            Item { Layout.preferredHeight: App.Theme.spacingLarge }
         }
     }
 

@@ -9,20 +9,25 @@ import "../components" as Components
 Item {
     id: settingsRoot
 
-    ScrollView {
+    Flickable {
+        id: settingsFlick
         anchors.fill: parent
-        contentWidth: availableWidth
+        clip: true
+        contentWidth: width
+        contentHeight: mainCol.height + App.Theme.spacingLarge * 2
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
 
-        Flickable {
-            contentHeight: mainCol.height + App.Theme.spacingLarge * 2
+        ScrollBar.vertical: Components.StyledScrollBar {}
 
-            ColumnLayout {
-                id: mainCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: App.Theme.spacingLarge
-                spacing: App.Theme.spacingLarge
+        ColumnLayout {
+            id: mainCol
+            width: settingsFlick.width
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: App.Theme.spacingLarge
+            spacing: App.Theme.spacingLarge
 
                 // 页面标题
                 Text {
@@ -555,9 +560,8 @@ Item {
                     }
                 }
 
-                // 底部间距
-                Item { Layout.preferredHeight: App.Theme.spacingLarge }
-            }
+            // 底部间距
+            Item { Layout.preferredHeight: App.Theme.spacingLarge }
         }
     }
 
@@ -897,13 +901,20 @@ Item {
                     clip: true
                     enabled: numInputRoot.enabled
 
-                    onEditingFinished: {
+                    function commit() {
                         var v = parseInt(text)
                         if (!isNaN(v)) {
                             v = Math.max(numInputRoot.minValue, Math.min(numInputRoot.maxValue, v))
+                            text = v.toString()
                             numInputRoot.valueEdited(v)
+                        } else {
+                            text = numInputRoot.value.toString()
                         }
                     }
+
+                    onEditingFinished: commit()
+                    Keys.onReturnPressed: function(event) { commit(); event.accepted = true }
+                    Keys.onEnterPressed: function(event) { commit(); event.accepted = true }
                 }
 
                 Text {
@@ -951,9 +962,13 @@ Item {
                 clip: true
                 enabled: textInputRoot.enabled
 
-                onEditingFinished: {
+                function commit() {
                     textInputRoot.textCommitted(text)
                 }
+
+                onEditingFinished: commit()
+                Keys.onReturnPressed: function(event) { commit(); event.accepted = true }
+                Keys.onEnterPressed: function(event) { commit(); event.accepted = true }
 
                 Text {
                     anchors.fill: parent

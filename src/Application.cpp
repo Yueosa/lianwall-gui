@@ -84,6 +84,33 @@ void Application::initComponents()
     // 配置管理（通过 DaemonClient 读写 daemon 配置）
     m_configManager = new ConfigManager(m_daemonClient, this);
 
+    // 壁纸库 / 配置错误统一上屏（此前只打日志，用户看不到）
+    connect(m_wallpaperModel, &WallpaperListModel::errorOccurred,
+            this, [this](const QString &message) {
+        // 旧 daemon 可能仍回 Timeout；业务上以 WallpaperChanged 为准，不当失败
+        if (message.contains(QLatin1String("timeout"), Qt::CaseInsensitive)) {
+            qWarning() << "[Application] Wallpaper op slow/timeout (ignored as business error):"
+                       << message;
+            return;
+        }
+        emit m_daemonState->daemonError(QStringLiteral("wallpaper"), message, true);
+    });
+    connect(m_configManager, &ConfigManager::errorOccurred,
+            this, [this](const QString &message) {
+        emit m_daemonState->daemonError(QStringLiteral("config"), message, true);
+    });
+
+    // 权威完成信号：壁纸真的变了 → 结束「切换中」
+    connect(m_daemonState, &DaemonState::wallpaperChanged,
+            this, [this](const QString &, const QString &, const QString &) {
+        finishWallpaperCommand();
+    });
+    connect(m_daemonState, &DaemonState::modeChanged,
+            this, [this]() {
+        // SetMode 空间为空时可能只改 mode、不发 WallpaperChanged
+        finishWallpaperCommand();
+    });
+
     // 启动连接
     m_daemonClient->connectToDaemon();
 }
@@ -344,7 +371,50 @@ void Application::doFinalQuit()
 
 void Application::finishWallpaperCommand()
 {
+    if (!m_wallpaperCommandInFlight)
+        return;
     m_wallpaperCommandInFlight = false;
+    emit wallpaperSwitchingChanged();
+}
+
+void Application::handleWallpaperCommandResponse(const Daemon::Response &r, const char *op)
+{
+    if (r.type != Daemon::ResponseType::Error) {
+        // Ok：引擎侧已完成。若事件已先到，finish 为 no-op；否则此处收尾
+        // （兼容 SetMode 同模式 / 空空间等可能不发 WallpaperChanged 的情况）
+        finishWallpaperCommand();
+        return;
+    }
+
+    auto err = r.asError();
+    qWarning() << "[Application]" << op << "failed:" << err.message
+               << "code:" << Daemon::errorCodeToString(err.code);
+
+    // Timeout 不是业务失败：保持「切换中」，等 WallpaperChanged / modeChanged
+    if (err.code == Daemon::ErrorCode::Timeout) {
+        qWarning() << "[Application]" << op
+                   << "timed out at IPC layer — waiting for wallpaper/mode event";
+        return;
+    }
+
+    finishWallpaperCommand();
+    emit m_daemonState->daemonError(
+        Daemon::errorCodeToString(err.code), err.message, true);
+}
+
+void Application::armWallpaperCommandGuard()
+{
+    if (!m_wallpaperCommandInFlight) {
+        m_wallpaperCommandInFlight = true;
+        emit wallpaperSwitchingChanged();
+    }
+    // 极端兜底：事件与回执皆丢失时恢复可点
+    QTimer::singleShot(60000, this, [this]() {
+        if (m_wallpaperCommandInFlight) {
+            qWarning() << "[Application] Wallpaper switching guard fired — clearing in-flight flag";
+            finishWallpaperCommand();
+        }
+    });
 }
 
 void Application::daemonNext()
@@ -353,16 +423,9 @@ void Application::daemonNext()
     if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
         return;
 
-    m_wallpaperCommandInFlight = true;
+    armWallpaperCommandGuard();
     m_daemonClient->next([this](const Daemon::Response &r) {
-        finishWallpaperCommand();
-
-        if (r.type == Daemon::ResponseType::Error) {
-            auto err = r.asError();
-            qWarning() << "[Application] Next failed:" << err.message;
-            emit m_daemonState->daemonError(
-                Daemon::errorCodeToString(err.code), err.message, true);
-        }
+        handleWallpaperCommandResponse(r, "Next");
     });
 }
 
@@ -372,16 +435,9 @@ void Application::daemonPrev()
     if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
         return;
 
-    m_wallpaperCommandInFlight = true;
+    armWallpaperCommandGuard();
     m_daemonClient->prev([this](const Daemon::Response &r) {
-        finishWallpaperCommand();
-
-        if (r.type == Daemon::ResponseType::Error) {
-            auto err = r.asError();
-            qWarning() << "[Application] Prev failed:" << err.message;
-            emit m_daemonState->daemonError(
-                Daemon::errorCodeToString(err.code), err.message, true);
-        }
+        handleWallpaperCommandResponse(r, "Prev");
     });
 }
 
@@ -430,16 +486,9 @@ void Application::daemonSetMode(const QString &mode)
         return;
 
     auto m = Daemon::wallModeFromString(mode);
-    m_wallpaperCommandInFlight = true;
+    armWallpaperCommandGuard();
     m_daemonClient->setMode(m, [this](const Daemon::Response &r) {
-        finishWallpaperCommand();
-
-        if (r.type == Daemon::ResponseType::Error) {
-            auto err = r.asError();
-            qWarning() << "[Application] SetMode failed:" << err.message;
-            emit m_daemonState->daemonError(
-                Daemon::errorCodeToString(err.code), err.message, true);
-        }
+        handleWallpaperCommandResponse(r, "SetMode");
     });
 }
 

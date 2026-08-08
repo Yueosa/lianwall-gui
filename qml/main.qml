@@ -37,8 +37,12 @@ ApplicationWindow {
     Connections {
         target: DaemonState
         function onDaemonError(code, message, recoverable) {
+            // 连接抖动 / IPC 超时：不是业务失败，不弹横幅
+            if (code === "connection_lost" || code === "timeout")
+                return
             errorLabel.text = message
             errorPopup.open()
+            errorAutoClose.interval = 5000
         }
     }
 

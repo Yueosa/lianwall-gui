@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".." as App
+import "../components" as Components
 import "../dialogs" as Dialogs
 
 /// Library 壁纸库
@@ -298,7 +299,9 @@ Item {
                 anchors.fill: parent
                 visible: WallpaperFilterModel.count > 0
                 clip: true
-                cacheBuffer: cellHeight * 4
+                // 加大缓冲：配合 ThumbnailProvider 内存 LRU，滑出视口不立刻丢掉纹理
+                cacheBuffer: cellHeight * 12
+                reuseItems: true
 
                 cellWidth: {
                     // 自适应列数：最少 2 列，每列最小 160px
@@ -309,9 +312,20 @@ Item {
 
                 model: WallpaperFilterModel
 
+                ScrollBar.vertical: Components.StyledScrollBar {}
+
                 delegate: Item {
                     width: wallpaperGrid.cellWidth
                     height: wallpaperGrid.cellHeight
+
+                    // GridView reuseItems 时属性可能在绑定前短暂为空，用 required 避免无效请求
+                    required property string wallpaperPath
+                    required property string wallpaperFilename
+                    required property bool wallpaperLocked
+                    required property bool wallpaperInCooldown
+                    required property bool wallpaperIsCurrent
+                    required property bool wallpaperIsVideo
+                    required property int index
 
                     Rectangle {
                         id: thumbCard
@@ -341,19 +355,18 @@ Item {
                                 Image {
                                     id: thumbImage
                                     anchors.fill: parent
-                                    sourceSize.width: Math.max(1, Math.ceil(width))
-                                    sourceSize.height: Math.max(1, Math.ceil(height))
-                                    source: {
-                                        if (wallpaperIsVideo) {
-                                            return "image://thumbnail/"
-                                                   + encodeURIComponent(wallpaperPath)
-                                                   + "?t=" + WallpaperModel.refreshToken
-                                        }
-                                        return "file://" + wallpaperPath + "#" + WallpaperModel.refreshToken
-                                    }
+                                    // 固定 Tiny 档 (320x180)，由 ThumbnailProvider 归档/LRU
+                                    sourceSize.width: 320
+                                    sourceSize.height: 180
+                                    source: wallpaperPath
+                                            ? ("image://thumbnail/"
+                                               + encodeURIComponent(wallpaperPath)
+                                               + "?t=" + WallpaperModel.refreshToken)
+                                            : ""
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
-                                    cache: true
+                                    // Qt Image 缓存交给我们自己的 LRU；避免双缓存撑爆内存
+                                    cache: false
 
                                     // 加载占位
                                     Rectangle {
@@ -372,7 +385,7 @@ Item {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.bottomMargin: 4
                                             width: 16; height: 16
-                                            running: wallpaperIsVideo && thumbImage.status === Image.Loading
+                                            running: thumbImage.status === Image.Loading
                                             visible: running
                                         }
                                     }
@@ -464,9 +477,6 @@ Item {
                     }
                 }
 
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                }
             }
         }
     }
