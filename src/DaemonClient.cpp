@@ -336,6 +336,11 @@ void DaemonClient::getConfig(const QString &key, ResponseCallback cb)
     sendRequest(Daemon::Request::getConfig(key), std::move(cb));
 }
 
+void DaemonClient::getRotationStatus(ResponseCallback cb)
+{
+    sendRequest(Daemon::Request::getRotationStatus(), std::move(cb));
+}
+
 // ============================================================================
 // Command API
 // ============================================================================
@@ -394,6 +399,16 @@ void DaemonClient::reloadConfig(ResponseCallback cb)
 void DaemonClient::shutdown(ResponseCallback cb)
 {
     sendRequest(Daemon::Request::shutdown(), std::move(cb));
+}
+
+void DaemonClient::pauseRotation(ResponseCallback cb)
+{
+    sendRequest(Daemon::Request::pauseRotation(), std::move(cb));
+}
+
+void DaemonClient::resumeRotation(ResponseCallback cb)
+{
+    sendRequest(Daemon::Request::resumeRotation(), std::move(cb));
 }
 
 // ============================================================================

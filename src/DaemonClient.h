@@ -65,6 +65,7 @@ public:
                   ResponseCallback cb = nullptr);
     void getTimeInfo(ResponseCallback cb = nullptr);
     void getConfig(const QString &key = QString(), ResponseCallback cb = nullptr);
+    void getRotationStatus(ResponseCallback cb = nullptr);
 
     // ========================================================================
     // Command 请求
@@ -82,6 +83,8 @@ public:
     void rescan(ResponseCallback cb = nullptr);
     void reloadConfig(ResponseCallback cb = nullptr);
     void shutdown(ResponseCallback cb = nullptr);
+    void pauseRotation(ResponseCallback cb = nullptr);
+    void resumeRotation(ResponseCallback cb = nullptr);
 
     // ========================================================================
     // Subscribe

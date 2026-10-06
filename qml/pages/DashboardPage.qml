@@ -21,6 +21,9 @@ Item {
         return ["mp4","mkv","webm","avi","mov","flv","wmv","m4v","3gp","ogv","ts","m2ts"].indexOf(ext) >= 0
     }
 
+    // 轮换是否暂停（daemon 暂停时把当前模式 interval 置 0，ConfigChanged 事件驱动刷新）
+    readonly property bool isPaused: (DaemonState.mode === "Video" ? ConfigManager.videoInterval : ConfigManager.imageInterval) === 0
+
     Flickable {
         id: dashFlick
         anchors.fill: parent
@@ -230,6 +233,17 @@ Item {
                                 var target = DaemonState.mode === "Video" ? "Image" : "Video"
                                 console.log("[Dashboard] Switch mode:", DaemonState.mode, "->", target)
                                 LianwallApp.daemonSetMode(target)
+                            }
+                        }
+
+                        ActionButton {
+                            icon: isPaused ? "▶️" : "⏸️"
+                            label: isPaused ? qsTr("恢复轮换") : qsTr("暂停轮换")
+                            onClicked: {
+                                if (isPaused)
+                                    LianwallApp.daemonResumeRotation()
+                                else
+                                    LianwallApp.daemonPauseRotation()
                             }
                         }
                     }

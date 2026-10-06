@@ -65,6 +65,8 @@ public slots:
     Q_INVOKABLE void daemonRescan();
     Q_INVOKABLE void daemonReloadConfig();
     Q_INVOKABLE void daemonSetMode(const QString &mode);
+    Q_INVOKABLE void daemonPauseRotation();
+    Q_INVOKABLE void daemonResumeRotation();
     Q_INVOKABLE void runSystemdCommand(const QString &action);
 
 signals:

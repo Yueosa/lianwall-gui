@@ -708,6 +708,21 @@ inline QByteArray unsubscribe() {
         .toJson(QJsonDocument::Compact) + '\n';
 }
 
+inline QByteArray pauseRotation() {
+    return QJsonDocument(QJsonObject{{QStringLiteral("cmd"), QStringLiteral("PauseRotation")}})
+        .toJson(QJsonDocument::Compact) + '\n';
+}
+
+inline QByteArray resumeRotation() {
+    return QJsonDocument(QJsonObject{{QStringLiteral("cmd"), QStringLiteral("ResumeRotation")}})
+        .toJson(QJsonDocument::Compact) + '\n';
+}
+
+inline QByteArray getRotationStatus() {
+    return QJsonDocument(QJsonObject{{QStringLiteral("cmd"), QStringLiteral("GetRotationStatus")}})
+        .toJson(QJsonDocument::Compact) + '\n';
+}
+
 } // namespace Request
 
 // ============================================================================

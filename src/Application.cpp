@@ -478,6 +478,38 @@ void Application::daemonReloadConfig()
         m_daemonClient->reloadConfig();
 }
 
+void Application::daemonPauseRotation()
+{
+    qDebug() << "[Application] daemonPauseRotation() called";
+    if (!m_daemonClient->isConnected())
+        return;
+
+    m_daemonClient->pauseRotation([this](const Daemon::Response &r) {
+        if (r.type == Daemon::ResponseType::Error) {
+            auto err = r.asError();
+            qWarning() << "[Application] PauseRotation failed:" << err.message;
+            emit m_daemonState->daemonError(
+                Daemon::errorCodeToString(err.code), err.message, true);
+        }
+    });
+}
+
+void Application::daemonResumeRotation()
+{
+    qDebug() << "[Application] daemonResumeRotation() called";
+    if (!m_daemonClient->isConnected())
+        return;
+
+    m_daemonClient->resumeRotation([this](const Daemon::Response &r) {
+        if (r.type == Daemon::ResponseType::Error) {
+            auto err = r.asError();
+            qWarning() << "[Application] ResumeRotation failed:" << err.message;
+            emit m_daemonState->daemonError(
+                Daemon::errorCodeToString(err.code), err.message, true);
+        }
+    });
+}
+
 void Application::daemonSetMode(const QString &mode)
 {
     qDebug() << "[Application] daemonSetMode() called, mode:" << mode
