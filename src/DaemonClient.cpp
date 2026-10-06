@@ -70,6 +70,7 @@ void DaemonClient::disconnectFromDaemon()
     m_autoReconnect = false;
     m_reconnectTimer->stop();
     m_pendingCallbacks.clear();
+    m_pendingOrder.clear();
     m_readBuffer.clear();
     m_expectingImmediateStatus = false;
 
@@ -100,18 +101,19 @@ void DaemonClient::onDisconnected()
     qDebug() << "[DaemonClient] Disconnected";
 
     // 清空未完成的回调
-    while (!m_pendingCallbacks.isEmpty()) {
-        auto cb = m_pendingCallbacks.dequeue();
-        if (cb) {
+    for (auto it = m_pendingCallbacks.begin(); it != m_pendingCallbacks.end(); ++it) {
+        if (it.value()) {
             Daemon::Response errResp;
             errResp.type = Daemon::ResponseType::Error;
             errResp.payload = QJsonObject{
                 {QStringLiteral("code"), QStringLiteral("connection_lost")},
                 {QStringLiteral("message"), QStringLiteral("Connection to daemon lost")},
             };
-            cb(errResp);
+            it.value()(errResp);
         }
     }
+    m_pendingCallbacks.clear();
+    m_pendingOrder.clear();
     m_readBuffer.clear();
     m_expectingImmediateStatus = false;
 
@@ -191,8 +193,13 @@ void DaemonClient::sendRequest(const QByteArray &data, ResponseCallback cb)
         return;
     }
 
-    m_pendingCallbacks.enqueue(cb);
-    m_socket->write(data);
+    quint64 id = nextRequestId();
+    auto obj = QJsonDocument::fromJson(data).object();
+    obj.insert(QStringLiteral("id"), static_cast<double>(id));
+
+    m_pendingCallbacks.insert(id, cb);
+    m_pendingOrder.enqueue(id);
+    m_socket->write(QJsonDocument(obj).toJson(QJsonDocument::Compact) + '\n');
     m_socket->flush();
 }
 
@@ -229,21 +236,48 @@ void DaemonClient::processLine(const QByteArray &line)
         return;
     }
 
+    // 顶层 id：daemon v3 响应回带请求 id；不带 id 的帧按 FIFO 兜底（旧 daemon v2 混跑）
+    const QJsonObject root = QJsonDocument::fromJson(line).object();
+
     // 普通请求-响应匹配
-    if (!m_pendingCallbacks.isEmpty()) {
-        auto cb = m_pendingCallbacks.dequeue();
-
-        // 如果是 Subscribed 响应且 immediate_sync，标记等待后续 Status
-        if (r.type == Daemon::ResponseType::Subscribed) {
-            m_expectingImmediateStatus = true;
+    ResponseCallback cb = nullptr;
+    bool matched = false;
+    if (root.contains(QStringLiteral("id"))) {
+        const quint64 id = static_cast<quint64>(root.value(QStringLiteral("id")).toDouble());
+        if (id == 0) {
+            // id==0 为推送帧，不匹配回调
+            return;
         }
-
-        if (cb)
-            cb(r);
+        if (!m_pendingCallbacks.contains(id)) {
+            qWarning() << "[DaemonClient] Unexpected response id:" << id;
+            return;
+        }
+        cb = m_pendingCallbacks.take(id);
+        m_pendingOrder.removeAll(id);
     } else {
-        qWarning() << "[DaemonClient] Unexpected response (no pending callback):"
-                    << static_cast<int>(r.type);
+        // 无 id：从队头取第一个仍有效的请求，跳过已被 id 匹配消耗的项
+        while (!m_pendingOrder.isEmpty()) {
+            const quint64 fifoId = m_pendingOrder.dequeue();
+            if (m_pendingCallbacks.contains(fifoId)) {
+                cb = m_pendingCallbacks.take(fifoId);
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            qWarning() << "[DaemonClient] Unexpected response (no pending callback):"
+                       << static_cast<int>(r.type);
+            return;
+        }
     }
+
+    // 如果是 Subscribed 响应且 immediate_sync，标记等待后续 Status
+    if (r.type == Daemon::ResponseType::Subscribed) {
+        m_expectingImmediateStatus = true;
+    }
+
+    if (cb)
+        cb(r);
 }
 
 void DaemonClient::resetBackoff()

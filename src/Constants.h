@@ -19,11 +19,11 @@ constexpr const char* APP_GITHUB_DAEMON = "https://github.com/Yueosa/lianwall";
 constexpr const char* APP_DESCRIPTION = "Graphical client for lianwalld — the LianWall wallpaper daemon";
 
 // ============================================================================
-// Socket 协议 (v2: 行分隔 JSON)
+// Socket 协议 (v3: 行分隔 JSON，响应回带请求 id)
 // ============================================================================
 namespace Protocol {
     constexpr const char* DEFAULT_SOCKET_PATH = "/tmp/lianwall.sock";
-    constexpr quint32 PROTOCOL_VERSION = 2;
+    constexpr quint32 PROTOCOL_VERSION = 3;
     constexpr qint64 MAX_MESSAGE_SIZE = 1024 * 1024;  // 1 MB
     constexpr int CONNECT_TIMEOUT_MS = 1000;
     constexpr int READ_TIMEOUT_MS = 5000;

@@ -12,6 +12,7 @@
 #include <QLocalSocket>
 #include <QTimer>
 #include <QQueue>
+#include <QHash>
 #include <functional>
 
 class DaemonClient : public QObject
@@ -118,6 +119,9 @@ private:
     /// 处理一行完整的 JSON 响应
     void processLine(const QByteArray &line);
 
+    /// 生成下一个请求 id
+    quint64 nextRequestId() { return ++m_nextRequestId; }
+
     QLocalSocket *m_socket = nullptr;
     QString m_socketPath;
     QByteArray m_readBuffer;
@@ -132,9 +136,15 @@ private:
     // daemon 自动拉起
     bool m_daemonStartAttempted = false;  // 每次生命周期只尝试启动一次
 
-    // 请求-响应匹配：FIFO 队列
-    // daemon 按顺序处理请求，所以响应也是有序的
-    QQueue<ResponseCallback> m_pendingCallbacks;
+    // 请求-响应匹配：按请求 id 精确匹配
+    // daemon v3 会在响应顶层回带请求的 id 字段
+    QHash<quint64, ResponseCallback> m_pendingCallbacks;
+
+    // id 插入顺序：供旧 daemon（响应不带 id）时 FIFO 兜底
+    QQueue<quint64> m_pendingOrder;
+
+    // 请求 id 计数器
+    quint64 m_nextRequestId = 0;
 
     // 订阅后等待 immediate_sync 的 Status 响应
     bool m_expectingImmediateStatus = false;
