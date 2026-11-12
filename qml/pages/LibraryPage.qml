@@ -31,6 +31,14 @@ Item {
     // daemon SpaceUpdated / 壁纸切换后自动刷新
     Connections {
         target: DaemonState
+        function onSpaceUpdated(mode) {
+            if (libRoot.activated && DaemonState.daemonConnected)
+                refreshTimer.restart()
+        }
+        function onModeChanged() {
+            if (libRoot.activated && DaemonState.daemonConnected)
+                refreshTimer.restart()
+        }
         function onTotalWallpapersChanged() {
             if (libRoot.activated && DaemonState.daemonConnected) {
                 refreshTimer.restart()
@@ -210,6 +218,18 @@ Item {
                 color: App.Theme.textSecondary
             }
             Item { Layout.fillWidth: true }
+            BusyIndicator {
+                visible: LianwallApp.wallpaperSwitching
+                running: visible
+                Layout.preferredWidth: 24
+                Layout.preferredHeight: 24
+            }
+            Text {
+                visible: LianwallApp.wallpaperSwitching
+                text: qsTr("切换中…")
+                font.pixelSize: App.Theme.fontSizeSmall
+                color: App.Theme.textSecondary
+            }
         }
 
         // ================================================================

@@ -16,6 +16,7 @@
 #include <QVector>
 
 class DaemonClient;
+class WallpaperController;
 
 // ============================================================================
 // WallpaperListModel — 原始数据模型
@@ -49,7 +50,7 @@ public:
         IsVideoRole,          // 根据文件扩展名判断
     };
 
-    explicit WallpaperListModel(DaemonClient *client, QObject *parent = nullptr);
+    explicit WallpaperListModel(DaemonClient *client, WallpaperController *controller, QObject *parent = nullptr);
 
     // --- QAbstractListModel 接口 ---
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -105,12 +106,16 @@ signals:
 
 private:
     DaemonClient *m_client;
+    WallpaperController *m_wallpaperController;
+    QString m_requestedMode;
+    bool m_reloadPending = false;
+    quint64 m_loadGeneration = 0;
+    quint64 m_contentRevision = 0;
     QVector<Daemon::WallpaperPoint> m_items;
     QString m_mode;
     bool m_loading = false;
     int m_refreshToken = 0;
     QSet<QString> m_pendingLockPaths;
-    QSet<QString> m_pendingSetPaths;
 };
 
 // ============================================================================

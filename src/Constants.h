@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFile>
 #include <QCoreApplication>
+#include <QStandardPaths>
 
 namespace LianwallGui {
 
@@ -12,7 +13,7 @@ namespace LianwallGui {
 // 版本信息
 // ============================================================================
 constexpr const char* APP_NAME = "LianWall";
-constexpr const char* APP_VERSION = "1.5.0";
+constexpr const char* APP_VERSION = "1.6.0";
 constexpr const char* APP_AUTHOR = "Lian";
 constexpr const char* APP_GITHUB_GUI = "https://github.com/Yueosa/lianwall-gui";
 constexpr const char* APP_GITHUB_DAEMON = "https://github.com/Yueosa/lianwall";
@@ -24,7 +25,8 @@ constexpr const char* APP_DESCRIPTION = "Graphical client for lianwalld — the 
 namespace Protocol {
     constexpr const char* DEFAULT_SOCKET_PATH = "/tmp/lianwall.sock";
     constexpr quint32 PROTOCOL_VERSION = 3;
-    constexpr qint64 MAX_MESSAGE_SIZE = 1024 * 1024;  // 1 MB
+    constexpr qint64 MAX_REQUEST_SIZE = 1024 * 1024;
+    constexpr qint64 MAX_RESPONSE_SIZE = 64LL * 1024 * 1024;
     constexpr int CONNECT_TIMEOUT_MS = 1000;
     constexpr int READ_TIMEOUT_MS = 5000;
 }
@@ -34,7 +36,7 @@ namespace Protocol {
 // ============================================================================
 namespace Paths {
     inline QString configDir() {
-        return QDir::homePath() + "/.config/lianwall";
+        return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/lianwall";
     }
     
     inline QString configFile() {
@@ -42,7 +44,7 @@ namespace Paths {
     }
     
     inline QString cacheDir() {
-        return QDir::homePath() + "/.cache/lianwall";
+        return QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + "/lianwall";
     }
     
     inline QString thumbnailDir() {
@@ -54,7 +56,7 @@ namespace Paths {
     }
     
     inline QString systemdServicePath() {
-        return QDir::homePath() + "/.config/systemd/user/lianwall-gui.service";
+        return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/systemd/user/lianwall-gui.service";
     }
     
     /// 查找 lianwalld 可执行文件

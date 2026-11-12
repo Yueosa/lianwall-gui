@@ -40,7 +40,7 @@ class ConfigManager : public QObject
     // --- image_engine ---
     Q_PROPERTY(int imageInterval READ imageInterval NOTIFY imageIntervalChanged)
     Q_PROPERTY(QString imageOutputs READ imageOutputs NOTIFY imageOutputsChanged)
-    Q_PROPERTY(QStringList swwwArgs READ swwwArgs NOTIFY swwwArgsChanged)
+    Q_PROPERTY(QStringList awwwArgs READ awwwArgs NOTIFY awwwArgsChanged)
 
     // --- vram ---
     Q_PROPERTY(bool vramEnabled READ vramEnabled NOTIFY vramEnabledChanged)
@@ -77,7 +77,7 @@ public:
     QStringList mpvArgs() const { return m_mpvArgs; }
     int imageInterval() const { return m_imageInterval; }
     QString imageOutputs() const { return m_imageOutputs; }
-    QStringList swwwArgs() const { return m_swwwArgs; }
+    QStringList awwwArgs() const { return m_awwwArgs; }
     bool vramEnabled() const { return m_vramEnabled; }
     double vramThresholdPercent() const { return m_vramThreshold; }
     double vramRecoveryPercent() const { return m_vramRecovery; }
@@ -109,7 +109,7 @@ public:
     Q_INVOKABLE void setMpvArgs(const QStringList &args);
     Q_INVOKABLE void setImageInterval(int secs);
     Q_INVOKABLE void setImageOutputs(const QString &outputs);
-    Q_INVOKABLE void setSwwwArgs(const QStringList &args);
+    Q_INVOKABLE void setAwwwArgs(const QStringList &args);
     Q_INVOKABLE void setVramEnabled(bool enabled);
     Q_INVOKABLE void setVramThresholdPercent(double percent);
     Q_INVOKABLE void setVramRecoveryPercent(double percent);
@@ -145,7 +145,7 @@ signals:
     void mpvArgsChanged();
     void imageIntervalChanged();
     void imageOutputsChanged();
-    void swwwArgsChanged();
+    void awwwArgsChanged();
     void vramEnabledChanged();
     void vramThresholdChanged();
     void vramRecoveryChanged();
@@ -179,6 +179,10 @@ private:
 
     DaemonClient *m_client;
     bool m_configLoaded = false;
+    bool m_reloadInFlight = false;
+    bool m_reloadPending = false;
+    quint64 m_reloadGeneration = 0;
+    quint64 m_revision = 0;
 
     // Daemon 配置缓存
     QString m_mode = QStringLiteral("Video");
@@ -190,7 +194,7 @@ private:
     QStringList m_mpvArgs;
     int m_imageInterval = 600;
     QString m_imageOutputs;
-    QStringList m_swwwArgs;
+    QStringList m_awwwArgs;
     bool m_vramEnabled = false;
     double m_vramThreshold = 25.0;
     double m_vramRecovery = 40.0;

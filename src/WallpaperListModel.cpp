@@ -1,5 +1,7 @@
 #include "WallpaperListModel.h"
 #include "DaemonClient.h"
+#include "WallpaperController.h"
+#include <QPointer>
 
 #include <QFileInfo>
 #include <QDebug>
@@ -16,10 +18,29 @@ static const QStringList kVideoExtensions = {
 // WallpaperListModel
 // ============================================================================
 
-WallpaperListModel::WallpaperListModel(DaemonClient *client, QObject *parent)
+WallpaperListModel::WallpaperListModel(DaemonClient *client, WallpaperController *controller, QObject *parent)
     : QAbstractListModel(parent)
     , m_client(client)
+    , m_wallpaperController(controller)
 {
+    connect(client, &DaemonClient::connectionChanged, this, [this](bool connected) {
+        if (connected)
+            return;
+        ++m_loadGeneration;
+        ++m_contentRevision;
+        m_reloadPending = false;
+        m_pendingLockPaths.clear();
+        if (m_loading) {
+            m_loading = false;
+            emit loadingChanged();
+        }
+    });
+    connect(client, &DaemonClient::eventReceived, this, [this](const Daemon::DaemonEvent &event) {
+        if (event.type == Daemon::EventType::SpaceUpdated
+            || event.type == Daemon::EventType::WallpaperChanged
+            || event.type == Daemon::EventType::StatusChanged)
+            ++m_contentRevision;
+    });
 }
 
 int WallpaperListModel::rowCount(const QModelIndex &parent) const
@@ -63,45 +84,46 @@ QHash<int, QByteArray> WallpaperListModel::roleNames() const
 
 void WallpaperListModel::load(const QString &mode)
 {
-    if (m_loading)
+    m_requestedMode = mode;
+    if (m_loading) {
+        m_reloadPending = true;
         return;
-
-    m_loading = true;
-    emit loadingChanged();
-
-    // 确定查询模式
-    std::optional<Daemon::WallMode> queryMode;
-    if (!mode.isEmpty()) {
-        queryMode = Daemon::wallModeFromString(mode);
     }
-
-    qDebug() << "[WallpaperListModel] Loading space"
-             << (queryMode ? Daemon::wallModeToString(*queryMode) : "(current mode)");
-
-    m_client->getSpace(queryMode, [this](const Daemon::Response &resp) {
-        if (resp.type == Daemon::ResponseType::Space) {
-            auto space = resp.asSpace();
-
-            beginResetModel();
-            m_items = space.items;
-            endResetModel();
-
-            ++m_refreshToken;
-            emit refreshTokenChanged();
-
-            m_mode = Daemon::wallModeToString(space.mode);
-            emit modeChanged();
-            emit countChanged();
-
-            qDebug() << "[WallpaperListModel] Loaded" << m_items.size() << "wallpapers in" << m_mode;
-        } else if (resp.type == Daemon::ResponseType::Error) {
-            auto err = resp.asError();
-            qWarning() << "[WallpaperListModel] Error:" << err.message;
-            emit errorOccurred(err.message);
+    if (!m_client->isConnected())
+        return;
+    m_loading = true;
+    m_reloadPending = false;
+    const quint64 generation = ++m_loadGeneration;
+    const quint64 revision = m_contentRevision;
+    emit loadingChanged();
+    std::optional<Daemon::WallMode> queryMode;
+    if (!mode.isEmpty())
+        queryMode = Daemon::wallModeFromString(mode);
+    const QPointer<WallpaperListModel> guard(this);
+    m_client->getSpace(queryMode, [guard, generation, revision](const Daemon::Response &response) {
+        if (!guard || generation != guard->m_loadGeneration)
+            return;
+        const bool again = guard->m_reloadPending || revision != guard->m_contentRevision;
+        if (!again && response.type == Daemon::ResponseType::Space) {
+            const auto space = response.asSpace();
+            guard->beginResetModel();
+            guard->m_items = space.items;
+            guard->endResetModel();
+            ++guard->m_refreshToken;
+            emit guard->refreshTokenChanged();
+            guard->m_mode = Daemon::wallModeToString(space.mode);
+            emit guard->modeChanged();
+            emit guard->countChanged();
+        } else if (response.type == Daemon::ResponseType::Error) {
+            emit guard->errorOccurred(response.asError().message);
         }
-
-        m_loading = false;
-        emit loadingChanged();
+        if (!guard)
+            return;
+        guard->m_loading = false;
+        guard->m_reloadPending = false;
+        emit guard->loadingChanged();
+        if (guard && again && !guard->m_loading && guard->m_client->isConnected())
+            guard->load(guard->m_requestedMode);
     });
 }
 
@@ -117,23 +139,23 @@ void WallpaperListModel::toggleLock(int row)
     m_pendingLockPaths.insert(path);
     qDebug() << "[WallpaperListModel] ToggleLock:" << m_items.at(row).filename;
 
-    m_client->toggleLock(path, [this, path](const Daemon::Response &resp) {
-        m_pendingLockPaths.remove(path);
-
-        if (resp.type == Daemon::ResponseType::Ok) {
-            // 按 path 查找（列表可能已被 load() 重置，row 不再可靠）
-            for (int i = 0; i < m_items.size(); ++i) {
-                if (m_items[i].path == path) {
-                    m_items[i].locked = !m_items[i].locked;
-                    auto idx = index(i);
-                    emit dataChanged(idx, idx, { LockedRole });
+    const bool targetLocked = !m_items.at(row).locked;
+    const QPointer<WallpaperListModel> guard(this);
+    m_client->toggleLock(path, [guard, path, targetLocked](const Daemon::Response &response) {
+        if (!guard)
+            return;
+        guard->m_pendingLockPaths.remove(path);
+        if (response.type == Daemon::ResponseType::Ok) {
+            for (int i = 0; i < guard->m_items.size(); ++i) {
+                if (guard->m_items[i].path == path) {
+                    guard->m_items[i].locked = targetLocked;
+                    const auto idx = guard->index(i);
+                    emit guard->dataChanged(idx, idx, { LockedRole });
                     break;
                 }
             }
-        } else if (resp.type == Daemon::ResponseType::Error) {
-            auto err = resp.asError();
-            qWarning() << "[WallpaperListModel] ToggleLock error:" << err.message;
-            emit errorOccurred(err.message);
+        } else if (response.type == Daemon::ResponseType::Error) {
+            emit guard->errorOccurred(response.asError().message);
         }
     });
 }
@@ -142,25 +164,7 @@ void WallpaperListModel::setAsCurrent(int row)
 {
     if (row < 0 || row >= m_items.size())
         return;
-
-    const auto &item = m_items.at(row);
-    if (m_pendingSetPaths.contains(item.path))
-        return;
-
-    m_pendingSetPaths.insert(item.path);
-    qDebug() << "[WallpaperListModel] SetWallpaper:" << item.path;
-
-    m_client->setWallpaper(item.path, [this, path = item.path](const Daemon::Response &resp) {
-        m_pendingSetPaths.remove(path);
-
-        if (resp.type == Daemon::ResponseType::Error) {
-            auto err = resp.asError();
-            qWarning() << "[WallpaperListModel] SetWallpaper error:" << err.message;
-            emit errorOccurred(err.message);
-        }
-        // isCurrent 状态将通过 WallpaperChanged 事件 → DaemonState 更新
-        // 下次 load() 时会反映新的 is_current 标记
-    });
+    m_wallpaperController->setWallpaper(m_items.at(row).path);
 }
 
 QString WallpaperListModel::pathAt(int row) const

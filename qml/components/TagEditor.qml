@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import ".." as App
 
 /// 数组参数编辑器
-/// 用于编辑 mpvpaper_args / mpv_args / swww_args
+/// 用于编辑 mpvpaper_args / mpv_args / awww_args
 /// 以 tag 标签列表显示，支持添加/删除
 Item {
     id: tagRoot

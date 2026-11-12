@@ -246,9 +246,7 @@ struct StatusPayload {
         p.protocolVersion   = static_cast<quint32>(obj[QLatin1String("protocol_version")].toInt());
         p.nextTimePoint     = obj[QLatin1String("next_time_point")].toString();
         p.timePointsCount   = obj[QLatin1String("time_points_count")].toInt();
-        p.nextSwitchSecs    = obj[QLatin1String("next_switch_secs")].isNull()
-                                  ? -1
-                                  : obj[QLatin1String("next_switch_secs")].toInt();
+        p.nextSwitchSecs    = obj[QLatin1String("next_switch_secs")].toInt(-1);
         return p;
     }
 };
@@ -740,6 +738,7 @@ enum class ResponseType {
     Config,
     Subscribed,
     Unsubscribed,
+    RotationStatus,
     Event,
     Unknown,
 };
@@ -754,6 +753,7 @@ inline ResponseType responseTypeFromString(const QString &s) {
     if (s == QLatin1String("Config"))       return ResponseType::Config;
     if (s == QLatin1String("Subscribed"))   return ResponseType::Subscribed;
     if (s == QLatin1String("Unsubscribed")) return ResponseType::Unsubscribed;
+    if (s == QLatin1String("RotationStatus")) return ResponseType::RotationStatus;
     if (s == QLatin1String("Event"))        return ResponseType::Event;
     return ResponseType::Unknown;
 }

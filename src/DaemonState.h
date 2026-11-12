@@ -96,6 +96,8 @@ signals:
     void wallpaperChanged(const QString &path, const QString &filename,
                           const QString &trigger);
 
+    void spaceUpdated(const QString &mode);
+
     /// 扫描进度
     void scanProgressUpdated(const QString &mode, int filesFound, bool completed);
 
@@ -112,6 +114,10 @@ private:
     void applyStatus(const Daemon::StatusPayload &status);
 
     DaemonClient *m_client;
+    quint64 m_revision = 0;
+    quint64 m_refreshGeneration = 0;
+    bool m_refreshInFlight = false;
+    bool m_refreshPending = false;
 
     // 缓存的状态值
     bool m_connected = false;

@@ -399,10 +399,10 @@ Item {
 
                             Components.TagEditor {
                                 Layout.fillWidth: true
-                                tags: ConfigManager.swwwArgs
+                                tags: ConfigManager.awwwArgs
                                 onTagsEdited: function(newTags) {
                                     if (DaemonState.daemonConnected)
-                                        ConfigManager.setSwwwArgs(newTags)
+                                        ConfigManager.setAwwwArgs(newTags)
                                 }
                             }
                         }

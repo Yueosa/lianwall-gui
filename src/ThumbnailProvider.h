@@ -21,6 +21,8 @@
 #include <QString>
 #include <QAtomicInt>
 #include <memory>
+#include <atomic>
+#include <QElapsedTimer>
 
 // ============================================================================
 // ThumbnailMemoryCache — 线程安全的字节预算 LRU
@@ -35,7 +37,7 @@ public:
     void put(const QString &key, const QImage &image);
     void clear();
     qint64 bytesUsed() const;
-    qint64 budget() const { return m_budget; }
+    qint64 budget() const;
     void setBudget(qint64 bytes);
 
 private:
@@ -55,6 +57,25 @@ private:
     qint64 m_budget = 0;
 };
 
+/// Shared worker lifetime, per-key deduplication and a soft disk-cache budget.
+class ThumbnailWorkState
+{
+public:
+    explicit ThumbnailWorkState(qint64 diskBudget = 512LL * 1024 * 1024, int maxEntries = 4096);
+    std::shared_ptr<QMutex> mutexFor(const QString &key);
+    void maintainDiskCache(const QString &directory, bool force = false);
+    std::atomic_bool stopping{false};
+    std::atomic_uint64_t generationAttempts{0};
+private:
+    QMutex m_mutex;
+    QHash<QString, std::weak_ptr<QMutex>> m_keys;
+    QMutex m_maintenanceMutex;
+    QElapsedTimer m_lastMaintenance;
+    quint64 m_writes = 0;
+    qint64 m_diskBudget;
+    int m_maxEntries;
+};
+
 // ============================================================================
 // ThumbnailResponse — 单个缩略图异步响应
 // ============================================================================
@@ -64,7 +85,8 @@ class ThumbnailResponse : public QQuickImageResponse, public QRunnable
 public:
     ThumbnailResponse(const QString &path, const QSize &requestedSize,
                       QThreadPool *pool, QSemaphore *ffmpegSemaphore,
-                      std::shared_ptr<ThumbnailMemoryCache> memoryCache);
+                      std::shared_ptr<ThumbnailMemoryCache> memoryCache,
+                      std::shared_ptr<ThumbnailWorkState> workState = std::make_shared<ThumbnailWorkState>());
 
     QQuickTextureFactory *textureFactory() const override;
     QString errorString() const override;
@@ -74,13 +96,12 @@ public:
 private:
     QImage loadImage() const;
     QImage loadVideoFrame() const;
-    QString cachePath() const;
+    bool cancelled() const;
     bool isVideo() const;
 
     static QSize snapSize(const QSize &requested);
     static QString cacheFilename(const QString &path, const QSize &size);
     static QString cacheDir();
-    static QString memoryKey(const QString &path, const QSize &size);
 
     QString m_path;
     QSize m_requestedSize;
@@ -88,6 +109,7 @@ private:
     QString m_errorString;
     QSemaphore *m_ffmpegSemaphore;
     std::shared_ptr<ThumbnailMemoryCache> m_memoryCache;
+    std::shared_ptr<ThumbnailWorkState> m_workState;
     QAtomicInt m_cancelled {0};
 };
 
@@ -113,4 +135,5 @@ private:
     QThreadPool m_pool;
     QSemaphore m_ffmpegSemaphore;
     std::shared_ptr<ThumbnailMemoryCache> m_memoryCache;
+    std::shared_ptr<ThumbnailWorkState> m_workState;
 };

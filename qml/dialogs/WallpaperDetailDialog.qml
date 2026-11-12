@@ -158,7 +158,7 @@ Dialog {
             Button {
                 Layout.fillWidth: true
                 text: detailDialog.wallpaperIsCurrent ? qsTr("✓ 当前壁纸") : qsTr("设为当前")
-                enabled: !detailDialog.wallpaperIsCurrent && DaemonState.daemonConnected
+                enabled: !detailDialog.wallpaperIsCurrent && DaemonState.daemonConnected && !LianwallApp.wallpaperSwitching
                 onClicked: {
                     WallpaperFilterModel.setAsCurrentByPath(detailDialog.wallpaperPath)
                     detailDialog.close()

@@ -2,6 +2,7 @@
 #include "DaemonClient.h"
 
 #include <QDebug>
+#include <QPointer>
 
 DaemonState::DaemonState(DaemonClient *client, QObject *parent)
     : QObject(parent)
@@ -23,10 +24,25 @@ void DaemonState::refresh()
 {
     if (!m_client->isConnected())
         return;
-
-    m_client->getStatus([this](const Daemon::Response &r) {
-        if (r.type == Daemon::ResponseType::Status)
-            applyStatus(r.asStatus());
+    if (m_refreshInFlight) {
+        m_refreshPending = true;
+        return;
+    }
+    m_refreshInFlight = true;
+    m_refreshPending = false;
+    const quint64 generation = ++m_refreshGeneration;
+    const quint64 revision = m_revision;
+    const QPointer<DaemonState> guard(this);
+    m_client->getStatus([guard, generation, revision](const Daemon::Response &response) {
+        if (!guard || generation != guard->m_refreshGeneration)
+            return;
+        const bool again = guard->m_refreshPending || revision != guard->m_revision;
+        guard->m_refreshInFlight = false;
+        guard->m_refreshPending = false;
+        if (!again && response.type == Daemon::ResponseType::Status)
+            guard->applyStatus(response.asStatus());
+        if (again && guard->m_client->isConnected())
+            guard->refresh();
     });
 }
 
@@ -39,6 +55,14 @@ void DaemonState::onConnectionChanged(bool connected)
     if (m_connected == connected)
         return;
     m_connected = connected;
+    ++m_revision;
+    ++m_refreshGeneration;
+    m_refreshInFlight = false;
+    m_refreshPending = false;
+    if (!connected) {
+        m_nextSwitchSecs = -1;
+        emit nextSwitchSecsChanged();
+    }
     emit daemonConnectedChanged();
 
     if (connected) {
@@ -49,12 +73,13 @@ void DaemonState::onConnectionChanged(bool connected)
 
 void DaemonState::onInitialStatus(const Daemon::StatusPayload &status)
 {
+    ++m_revision;
     applyStatus(status);
 }
 
 void DaemonState::onEvent(const Daemon::DaemonEvent &event)
 {
-    qDebug() << "[DaemonState] onEvent type:" << static_cast<int>(event.type);
+    ++m_revision;
 
     switch (event.type) {
 
@@ -104,11 +129,12 @@ void DaemonState::onEvent(const Daemon::DaemonEvent &event)
                 if (m_vramDegraded != v) { m_vramDegraded = v; emit vramDegradedChanged(); }
             }
         }
+        refresh();
         break;
     }
 
     case Daemon::EventType::SpaceUpdated: {
-        // 空间更新后刷新完整状态
+        emit spaceUpdated(Daemon::wallModeToString(event.asSpaceUpdated().mode));
         refresh();
         break;
     }

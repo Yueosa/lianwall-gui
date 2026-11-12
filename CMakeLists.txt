@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lianwall-gui VERSION 1.5.0 LANGUAGES CXX)
+project(lianwall-gui VERSION 1.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,20 +31,24 @@ set(SOURCES
     src/main.cpp
     src/Application.cpp
     src/ConfigManager.cpp
+    src/SettingsStorage.cpp
     src/DaemonClient.cpp
     src/DaemonState.cpp
     src/WallpaperListModel.cpp
+    src/WallpaperController.cpp
     src/ThumbnailProvider.cpp
 )
 
 set(HEADERS
     src/Application.h
     src/ConfigManager.h
+    src/SettingsStorage.h
     src/Constants.h
     src/DaemonTypes.h
     src/DaemonClient.h
     src/DaemonState.h
     src/WallpaperListModel.h
+    src/WallpaperController.h
     src/ThumbnailProvider.h
 )
 
@@ -118,3 +122,30 @@ install(FILES packaging/lianwall-gui.desktop
 install(FILES resources/icons/lianwall.png
     DESTINATION share/icons/hicolor/scalable/apps
 )
+
+option(LIANWALL_BUILD_TESTS "Build GUI socket and state regression tests" OFF)
+if(LIANWALL_BUILD_TESTS)
+    enable_testing()
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    qt_add_executable(test-daemon-client
+        tests/TestDaemonClient.cpp
+        src/ConfigManager.cpp src/ConfigManager.h
+        src/SettingsStorage.cpp src/SettingsStorage.h
+        src/DaemonClient.cpp src/DaemonClient.h
+        src/DaemonState.cpp src/DaemonState.h
+        src/WallpaperController.cpp src/WallpaperController.h
+        src/WallpaperListModel.cpp src/WallpaperListModel.h
+    )
+    target_include_directories(test-daemon-client PRIVATE src)
+    target_link_libraries(test-daemon-client PRIVATE Qt6::Core Qt6::Gui Qt6::Network Qt6::Test)
+    add_test(NAME daemon-client COMMAND test-daemon-client)
+    qt_add_executable(test-thumbnail
+        tests/TestThumbnail.cpp
+        src/ThumbnailProvider.cpp src/ThumbnailProvider.h
+        src/SettingsStorage.cpp src/SettingsStorage.h
+    )
+    target_include_directories(test-thumbnail PRIVATE src)
+    target_link_libraries(test-thumbnail PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test)
+    add_test(NAME thumbnail COMMAND test-thumbnail)
+    set_tests_properties(thumbnail PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()

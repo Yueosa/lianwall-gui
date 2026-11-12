@@ -6,6 +6,7 @@
 #include "DaemonTypes.h"
 #include "WallpaperListModel.h"
 #include "ThumbnailProvider.h"
+#include "WallpaperController.h"
 
 #include <QQmlContext>
 #include <QIcon>
@@ -45,11 +46,11 @@ Application::Application(int &argc, char **argv)
     m_app->setQuitOnLastWindowClosed(false);
 }
 
-void Application::init()
+void Application::init(const QString &socketPath)
 {
     m_engine = new QQmlApplicationEngine(this);
 
-    initComponents();
+    initComponents(socketPath);
     initSystemTray();
     loadTranslations();
     registerQmlTypes();
@@ -70,14 +71,27 @@ Application::~Application()
 // 组件初始化
 // ============================================================================
 
-void Application::initComponents()
+void Application::initComponents(const QString &socketPath)
 {
     // 通信层
     m_daemonClient = new DaemonClient(this);
+    if (!socketPath.isEmpty())
+        m_daemonClient->setSocketPath(socketPath);
     m_daemonState  = new DaemonState(m_daemonClient, this);
 
+    m_wallpaperController = new WallpaperController(m_daemonClient, this);
+    connect(m_wallpaperController, &WallpaperController::busyChanged,
+            this, &Application::wallpaperSwitchingChanged);
+    connect(m_wallpaperController, &WallpaperController::refreshRequested,
+            m_daemonState, &DaemonState::refresh);
+    connect(m_wallpaperController, &WallpaperController::errorOccurred,
+            this, [this](const QString &code, const QString &message) {
+        if (!m_quitting)
+            emit m_daemonState->daemonError(code, message, true);
+    });
+
     // 壁纸模型
-    m_wallpaperModel = new WallpaperListModel(m_daemonClient, this);
+    m_wallpaperModel = new WallpaperListModel(m_daemonClient, m_wallpaperController, this);
     m_wallpaperFilterModel = new WallpaperFilterModel(this);
     m_wallpaperFilterModel->setSourceModel(m_wallpaperModel);
 
@@ -100,17 +114,6 @@ void Application::initComponents()
         emit m_daemonState->daemonError(QStringLiteral("config"), message, true);
     });
 
-    // 权威完成信号：壁纸真的变了 → 结束「切换中」
-    connect(m_daemonState, &DaemonState::wallpaperChanged,
-            this, [this](const QString &, const QString &, const QString &) {
-        finishWallpaperCommand();
-    });
-    connect(m_daemonState, &DaemonState::modeChanged,
-            this, [this]() {
-        // SetMode 空间为空时可能只改 mode、不发 WallpaperChanged
-        finishWallpaperCommand();
-    });
-
     // 启动连接
     m_daemonClient->connectToDaemon();
 }
@@ -129,14 +132,14 @@ void Application::initSystemTray()
     connect(nextAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Next clicked, connected:" << m_daemonClient->isConnected();
         if (m_daemonClient->isConnected())
-            m_daemonClient->next();
+            daemonNext();
     });
 
     auto *prevAction = m_trayMenu->addAction(tr("◀️ 上一张"));
     connect(prevAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Prev clicked, connected:" << m_daemonClient->isConnected();
         if (m_daemonClient->isConnected())
-            m_daemonClient->prev();
+            daemonPrev();
     });
 
     m_trayMenu->addSeparator();
@@ -159,14 +162,9 @@ void Application::initSystemTray()
     connect(restartAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Restart daemon requested";
         if (m_daemonClient->isConnected()) {
-            m_daemonClient->shutdown([this](const Daemon::Response &) {
-                // shutdown 响应到达后立即重置并拉起新 daemon
-                m_daemonClient->resetStartAttempt();
-                m_daemonClient->resetBackoff();
-                // 短延迟后启动新 daemon（等旧进程释放 socket）
-                QTimer::singleShot(200, this, [this]() {
-                    m_daemonClient->tryStartDaemon();
-                });
+            m_daemonClient->restartDaemon([this](const Daemon::Response &response) {
+                if (response.type == Daemon::ResponseType::Error)
+                    emit m_daemonState->daemonError(QStringLiteral("restart"), response.asError().message, true);
             });
         }
     });
@@ -369,76 +367,19 @@ void Application::doFinalQuit()
 // QML 可调用的 Daemon 命令
 // ============================================================================
 
-void Application::finishWallpaperCommand()
+bool Application::wallpaperSwitching() const
 {
-    if (!m_wallpaperCommandInFlight)
-        return;
-    m_wallpaperCommandInFlight = false;
-    emit wallpaperSwitchingChanged();
-}
-
-void Application::handleWallpaperCommandResponse(const Daemon::Response &r, const char *op)
-{
-    if (r.type != Daemon::ResponseType::Error) {
-        // Ok：引擎侧已完成。若事件已先到，finish 为 no-op；否则此处收尾
-        // （兼容 SetMode 同模式 / 空空间等可能不发 WallpaperChanged 的情况）
-        finishWallpaperCommand();
-        return;
-    }
-
-    auto err = r.asError();
-    qWarning() << "[Application]" << op << "failed:" << err.message
-               << "code:" << Daemon::errorCodeToString(err.code);
-
-    // Timeout 不是业务失败：保持「切换中」，等 WallpaperChanged / modeChanged
-    if (err.code == Daemon::ErrorCode::Timeout) {
-        qWarning() << "[Application]" << op
-                   << "timed out at IPC layer — waiting for wallpaper/mode event";
-        return;
-    }
-
-    finishWallpaperCommand();
-    emit m_daemonState->daemonError(
-        Daemon::errorCodeToString(err.code), err.message, true);
-}
-
-void Application::armWallpaperCommandGuard()
-{
-    if (!m_wallpaperCommandInFlight) {
-        m_wallpaperCommandInFlight = true;
-        emit wallpaperSwitchingChanged();
-    }
-    // 极端兜底：事件与回执皆丢失时恢复可点
-    QTimer::singleShot(60000, this, [this]() {
-        if (m_wallpaperCommandInFlight) {
-            qWarning() << "[Application] Wallpaper switching guard fired — clearing in-flight flag";
-            finishWallpaperCommand();
-        }
-    });
+    return m_wallpaperController && m_wallpaperController->busy();
 }
 
 void Application::daemonNext()
 {
-    qDebug() << "[Application] daemonNext() called, connected:" << m_daemonClient->isConnected();
-    if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
-        return;
-
-    armWallpaperCommandGuard();
-    m_daemonClient->next([this](const Daemon::Response &r) {
-        handleWallpaperCommandResponse(r, "Next");
-    });
+    m_wallpaperController->next();
 }
 
 void Application::daemonPrev()
 {
-    qDebug() << "[Application] daemonPrev() called, connected:" << m_daemonClient->isConnected();
-    if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
-        return;
-
-    armWallpaperCommandGuard();
-    m_daemonClient->prev([this](const Daemon::Response &r) {
-        handleWallpaperCommandResponse(r, "Prev");
-    });
+    m_wallpaperController->prev();
 }
 
 void Application::daemonToggleLock()
@@ -512,16 +453,7 @@ void Application::daemonResumeRotation()
 
 void Application::daemonSetMode(const QString &mode)
 {
-    qDebug() << "[Application] daemonSetMode() called, mode:" << mode
-             << "connected:" << m_daemonClient->isConnected();
-    if (!m_daemonClient->isConnected() || m_wallpaperCommandInFlight)
-        return;
-
-    auto m = Daemon::wallModeFromString(mode);
-    armWallpaperCommandGuard();
-    m_daemonClient->setMode(m, [this](const Daemon::Response &r) {
-        handleWallpaperCommandResponse(r, "SetMode");
-    });
+    m_wallpaperController->setMode(Daemon::wallModeFromString(mode));
 }
 
 void Application::runSystemdCommand(const QString &action)

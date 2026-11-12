@@ -9,6 +9,9 @@
 #include <QStandardPaths>
 #include <QDebug>
 #include <QUrl>
+#include <QSaveFile>
+#include <QRegularExpression>
+#include <QScopeGuard>
 
 // ============================================================================
 // 常量
@@ -36,7 +39,7 @@ qint64 ThumbnailMemoryCache::imageBytes(const QImage &img)
     if (img.isNull())
         return 0;
     // depth() 是 bits-per-pixel
-    return static_cast<qint64>(img.width()) * img.height() * qMax(1, img.depth() / 8);
+    return img.sizeInBytes();
 }
 
 qint64 ThumbnailMemoryCache::bytesUsed() const
@@ -94,25 +97,76 @@ void ThumbnailMemoryCache::put(const QString &key, const QImage &image)
 {
     if (key.isEmpty() || image.isNull())
         return;
-
     const qint64 bytes = imageBytes(image);
     QMutexLocker lock(&m_mutex);
+    auto old = m_entries.find(key);
+    if (old != m_entries.end()) {
+        m_bytes -= old->bytes;
+        m_entries.erase(old);
+        m_lru.removeOne(key);
+    }
+    if (bytes > m_budget)
+        return;
+    evictLocked(bytes);
+    m_entries.insert(key, Entry{image, bytes});
+    m_lru.append(key);
+    m_bytes += bytes;
+}
 
-    auto it = m_entries.find(key);
-    if (it != m_entries.end()) {
-        m_bytes -= it->bytes;
-        it->image = image;
-        it->bytes = bytes;
-        m_bytes += bytes;
-        touchLocked(key);
-    } else {
-        evictLocked(bytes);
-        // 单图超过预算时仍保留一张（避免完全无法缓存）
-        if (bytes > m_budget && !m_lru.isEmpty())
-            evictLocked(m_budget); // 清空后只放这一张
-        m_entries.insert(key, Entry{image, bytes});
-        m_lru.append(key);
-        m_bytes += bytes;
+qint64 ThumbnailMemoryCache::budget() const
+{
+    QMutexLocker lock(&m_mutex);
+    return m_budget;
+}
+
+ThumbnailWorkState::ThumbnailWorkState(qint64 diskBudget, int maxEntries)
+    : m_diskBudget(qMax<qint64>(0, diskBudget)), m_maxEntries(qMax(0, maxEntries))
+{
+}
+
+std::shared_ptr<QMutex> ThumbnailWorkState::mutexFor(const QString &key)
+{
+    QMutexLocker lock(&m_mutex);
+    if (auto current = m_keys.value(key).lock())
+        return current;
+    if (m_keys.size() >= 512) {
+        for (auto it = m_keys.begin(); it != m_keys.end();) {
+            if (it.value().expired()) it = m_keys.erase(it); else ++it;
+        }
+    }
+    auto current = std::make_shared<QMutex>();
+    m_keys.insert(key, current);
+    return current;
+}
+
+void ThumbnailWorkState::maintainDiskCache(const QString &directory, bool force)
+{
+    if (!m_maintenanceMutex.tryLock())
+        return;
+    const auto unlock = qScopeGuard([this]() { m_maintenanceMutex.unlock(); });
+    ++m_writes;
+    if (!force && m_lastMaintenance.isValid() && m_lastMaintenance.elapsed() < 60000 && m_writes % 64 != 0)
+        return;
+    m_lastMaintenance.start();
+    // Only v2 filenames owned by this cache are eligible; never delete source images.
+    static const QRegularExpression owned(QStringLiteral("^v2_[0-9a-f]{64}_[0-9]+x[0-9]+\\.jpg$"));
+    auto files = QDir(directory).entryInfoList({QStringLiteral("v2_*.jpg")}, QDir::Files | QDir::NoSymLinks, QDir::Time | QDir::Reversed);
+    QList<QFileInfo> candidates;
+    qint64 total = 0;
+    for (const auto &file : files) {
+        if (owned.match(file.fileName()).hasMatch()) {
+            candidates.append(file);
+            total += file.size();
+        }
+    }
+    int remaining = candidates.size();
+    for (const auto &file : candidates) {
+        if (total <= m_diskBudget && remaining <= m_maxEntries)
+            break;
+        if (QFile::remove(file.absoluteFilePath())) {
+            total -= file.size();
+            --remaining;
+        }
     }
 }
 
@@ -122,11 +176,13 @@ void ThumbnailMemoryCache::put(const QString &key, const QImage &image)
 
 ThumbnailResponse::ThumbnailResponse(const QString &path, const QSize &requestedSize,
                                      QThreadPool *pool, QSemaphore *ffmpegSemaphore,
-                                     std::shared_ptr<ThumbnailMemoryCache> memoryCache)
+                                     std::shared_ptr<ThumbnailMemoryCache> memoryCache,
+                                     std::shared_ptr<ThumbnailWorkState> workState)
     : m_path(QUrl::fromPercentEncoding(path.toUtf8()))
     , m_requestedSize(snapSize(requestedSize))
     , m_ffmpegSemaphore(ffmpegSemaphore)
     , m_memoryCache(std::move(memoryCache))
+    , m_workState(std::move(workState))
 {
     setAutoDelete(false);
     pool->start(this);
@@ -166,87 +222,74 @@ QSize ThumbnailResponse::snapSize(const QSize &requested)
 
     auto pair = getSize(q);
     // 保持请求方向（竖图/横图）的近似比例：按请求框 fit 进档位
-    return QSize(pair.first, pair.second);
+    return req.height() > req.width() ? QSize(pair.second, pair.first) : QSize(pair.first, pair.second);
 }
 
-QString ThumbnailResponse::memoryKey(const QString &path, const QSize &size)
+bool ThumbnailResponse::cancelled() const
 {
-    return cacheFilename(path, size);
+    return m_cancelled.loadRelaxed() || m_workState->stopping.load();
 }
 
 void ThumbnailResponse::run()
 {
-    if (m_cancelled.loadRelaxed()) {
-        emit finished();
+    const auto finish = qScopeGuard([this]() { emit finished(); });
+    if (cancelled())
+        return;
+    const QFileInfo source(m_path);
+    if (!source.exists() || !source.isFile()) {
+        m_errorString = QStringLiteral("Source file does not exist: ") + m_path;
         return;
     }
-
-    if (m_path.isEmpty()) {
-        m_errorString = QStringLiteral("Empty path");
-        emit finished();
-        return;
-    }
-
-    const QString memKey = memoryKey(m_path, m_requestedSize);
-
-    // 1) 内存 LRU
-    if (m_memoryCache) {
-        m_image = m_memoryCache->get(memKey);
-        if (!m_image.isNull()) {
-            emit finished();
+    const QString key = cacheFilename(m_path, m_requestedSize);
+    const auto keyMutex = m_workState->mutexFor(key);
+    while (!keyMutex->tryLock(50)) {
+        if (cancelled())
             return;
-        }
     }
-
-    if (m_cancelled.loadRelaxed()) {
-        emit finished();
+    const auto unlock = qScopeGuard([keyMutex]() { keyMutex->unlock(); });
+    if (cancelled())
+        return;
+    m_workState->maintainDiskCache(cacheDir());
+    if (m_memoryCache)
+        m_image = m_memoryCache->get(key);
+    if (!m_image.isNull()) {
+        if (key != cacheFilename(m_path, m_requestedSize) || !QFileInfo::exists(m_path)) {
+            m_image = {};
+            m_errorString = QStringLiteral("Source changed during thumbnail lookup");
+        }
         return;
     }
-
-    // 2) 磁盘缓存
-    const QString cached = cachePath();
-    if (QFileInfo::exists(cached)) {
-        QFileInfo sourceInfo(m_path);
-        QFileInfo cacheInfo(cached);
-        if (sourceInfo.lastModified() <= cacheInfo.lastModified()) {
-            m_image = QImage(cached);
-            if (!m_image.isNull()) {
-                if (m_memoryCache)
-                    m_memoryCache->put(memKey, m_image);
-                emit finished();
-                return;
-            }
-        }
+    const QString cached = cacheDir() + "/" + key;
+    m_image = QImage(cached);
+    const bool diskHit = !m_image.isNull();
+    if (!diskHit) {
+        m_workState->generationAttempts.fetch_add(1);
+        m_image = isVideo() ? loadVideoFrame() : loadImage();
     }
-
-    if (m_cancelled.loadRelaxed()) {
-        emit finished();
-        return;
-    }
-
-    // 3) 生成
-    if (isVideo())
-        m_image = loadVideoFrame();
-    else
-        m_image = loadImage();
-
-    if (m_cancelled.loadRelaxed()) {
+    if (cancelled()) {
         m_image = {};
-        emit finished();
         return;
     }
-
-    if (m_image.isNull()) {
-        if (m_errorString.isEmpty())
-            m_errorString = QStringLiteral("Failed to generate thumbnail for: ") + m_path;
-    } else {
-        QDir().mkpath(cacheDir());
-        m_image.save(cached, "JPEG", LianwallGui::Thumbnail::QUALITY);
-        if (m_memoryCache)
-            m_memoryCache->put(memKey, m_image);
+    if (key != cacheFilename(m_path, m_requestedSize) || !QFileInfo::exists(m_path)) {
+        m_image = {};
+        m_errorString = QStringLiteral("Source changed during thumbnail generation");
+        return;
     }
-
-    emit finished();
+    if (m_image.isNull()) {
+        m_errorString = QStringLiteral("Failed to generate thumbnail for: ") + m_path;
+        return;
+    }
+    if (m_memoryCache)
+        m_memoryCache->put(key, m_image);
+    if (!diskHit) {
+        QSaveFile output(cached);
+        if (!QDir().mkpath(cacheDir()) || !output.open(QIODevice::WriteOnly)
+            || !m_image.save(&output, "JPEG", LianwallGui::Thumbnail::QUALITY) || !output.commit()) {
+            qWarning() << "[ThumbnailProvider] Failed to save cache:" << cached << output.errorString();
+        } else {
+            m_workState->maintainDiskCache(cacheDir());
+        }
+    }
 }
 
 QImage ThumbnailResponse::loadImage() const
@@ -277,20 +320,22 @@ QImage ThumbnailResponse::loadImage() const
 
 QImage ThumbnailResponse::loadVideoFrame() const
 {
-    if (!m_ffmpegSemaphore->tryAcquire(1, kFfmpegTimeoutMs)) {
-        qWarning() << "[ThumbnailProvider] Timeout waiting for ffmpeg slot:" << m_path;
-        return {};
+    QElapsedTimer wait;
+    wait.start();
+    while (!m_ffmpegSemaphore->tryAcquire(1, 50)) {
+        if (cancelled() || wait.elapsed() >= kFfmpegTimeoutMs)
+            return {};
     }
+    const auto release = qScopeGuard([this]() { m_ffmpegSemaphore->release(); });
 
     // 取消时尽快释放
-    if (m_cancelled.loadRelaxed()) {
-        m_ffmpegSemaphore->release();
+    if (cancelled()) {
         return {};
     }
 
     auto runFfmpeg = [this](const QString &seekSecs) -> QImage {
         QProcess ffmpeg;
-        ffmpeg.setProcessChannelMode(QProcess::MergedChannels);
+        ffmpeg.setProcessChannelMode(QProcess::SeparateChannels);
 
         // -ss 放在 -i 前：输入 seek，对大视频快很多
         const QStringList args = {
@@ -313,10 +358,14 @@ QImage ThumbnailResponse::loadVideoFrame() const
         if (!ffmpeg.waitForStarted(3000))
             return {};
 
-        if (!ffmpeg.waitForFinished(kFfmpegTimeoutMs)) {
-            ffmpeg.kill();
-            ffmpeg.waitForFinished(2000);
-            return {};
+        QElapsedTimer elapsed;
+        elapsed.start();
+        while (ffmpeg.state() != QProcess::NotRunning && !ffmpeg.waitForFinished(50)) {
+            if (cancelled() || elapsed.elapsed() >= kFfmpegTimeoutMs) {
+                ffmpeg.kill();
+                ffmpeg.waitForFinished(1000);
+                return {};
+            }
         }
 
         if (ffmpeg.exitCode() != 0)
@@ -328,10 +377,8 @@ QImage ThumbnailResponse::loadVideoFrame() const
     };
 
     QImage result = runFfmpeg(QString::number(LianwallGui::Thumbnail::SEEK_SECONDS));
-    if (result.isNull() && !m_cancelled.loadRelaxed())
+    if (result.isNull() && !cancelled())
         result = runFfmpeg(QStringLiteral("0"));
-
-    m_ffmpegSemaphore->release();
 
     if (!result.isNull()
         && result.format() != QImage::Format_RGB32
@@ -339,11 +386,6 @@ QImage ThumbnailResponse::loadVideoFrame() const
         result = result.convertToFormat(QImage::Format_RGB32);
     }
     return result;
-}
-
-QString ThumbnailResponse::cachePath() const
-{
-    return cacheDir() + "/" + cacheFilename(m_path, m_requestedSize);
 }
 
 bool ThumbnailResponse::isVideo() const
@@ -354,18 +396,18 @@ bool ThumbnailResponse::isVideo() const
 
 QString ThumbnailResponse::cacheFilename(const QString &path, const QSize &size)
 {
-    QByteArray hash = QCryptographicHash::hash(
-        path.toUtf8(), QCryptographicHash::Md5).toHex();
-    return QStringLiteral("%1_%2x%3.jpg")
-        .arg(QString::fromLatin1(hash))
-        .arg(size.width())
-        .arg(size.height());
+    const QFileInfo source(path);
+    QByteArray identity = source.canonicalFilePath().toUtf8() + '\0';
+    identity += QByteArray::number(source.size()) + ':';
+    identity += QByteArray::number(source.lastModified().toMSecsSinceEpoch()) + ':';
+    identity += QByteArray::number(source.metadataChangeTime().toMSecsSinceEpoch());
+    const auto hash = QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex();
+    return QStringLiteral("v2_%1_%2x%3.jpg").arg(QString::fromLatin1(hash)).arg(size.width()).arg(size.height());
 }
 
 QString ThumbnailResponse::cacheDir()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
-           + QStringLiteral("/thumbnails");
+    return LianwallGui::Paths::thumbnailDir();
 }
 
 // ============================================================================
@@ -375,6 +417,7 @@ QString ThumbnailResponse::cacheDir()
 ThumbnailProvider::ThumbnailProvider()
     : m_ffmpegSemaphore(2)
     , m_memoryCache(std::make_shared<ThumbnailMemoryCache>(96LL * 1024 * 1024))
+    , m_workState(std::make_shared<ThumbnailWorkState>())
 {
     // 磁盘命中很快，可多线程；ffmpeg 另有信号量限制
     m_pool.setMaxThreadCount(6);
@@ -382,7 +425,9 @@ ThumbnailProvider::ThumbnailProvider()
 
 ThumbnailProvider::~ThumbnailProvider()
 {
-    m_pool.waitForDone(5000);
+    m_workState->stopping.store(true);
+    // Semaphore and worker state must remain alive until all jobs stop.
+    m_pool.waitForDone();
 }
 
 void ThumbnailProvider::setMemoryBudget(qint64 bytes)
@@ -410,5 +455,5 @@ QQuickImageResponse *ThumbnailProvider::requestImageResponse(
         cleanId = cleanId.left(queryIdx);
 
     return new ThumbnailResponse(cleanId, requestedSize, &m_pool,
-                                 &m_ffmpegSemaphore, m_memoryCache);
+                                 &m_ffmpegSemaphore, m_memoryCache, m_workState);
 }

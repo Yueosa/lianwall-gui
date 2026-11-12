@@ -13,6 +13,7 @@
 #include <QTimer>
 #include <QQueue>
 #include <QHash>
+#include <QElapsedTimer>
 #include <functional>
 
 class DaemonClient : public QObject
@@ -21,7 +22,7 @@ class DaemonClient : public QObject
     Q_PROPERTY(bool connected READ isConnected NOTIFY connectionChanged)
 
 public:
-    explicit DaemonClient(QObject *parent = nullptr);
+    explicit DaemonClient(QObject *parent = nullptr, int requestTimeoutMs = 10000, QString daemonExecutable = QString());
     ~DaemonClient() override;
 
     /// 连接状态
@@ -50,7 +51,7 @@ public:
     void resetBackoff();
 
     /// 尝试启动 daemon 进程
-    void tryStartDaemon();
+    bool tryStartDaemon();
 
     // ========================================================================
     // Query 请求
@@ -83,6 +84,7 @@ public:
     void rescan(ResponseCallback cb = nullptr);
     void reloadConfig(ResponseCallback cb = nullptr);
     void shutdown(ResponseCallback cb = nullptr);
+    void restartDaemon(ResponseCallback cb = nullptr);
     void pauseRotation(ResponseCallback cb = nullptr);
     void resumeRotation(ResponseCallback cb = nullptr);
 
@@ -114,6 +116,7 @@ private slots:
     void onReadyRead();
     void onSocketError(QLocalSocket::LocalSocketError error);
     void tryReconnect();
+    void checkRequestTimeouts();
 
 private:
     /// 发送原始请求并注册回调
@@ -127,6 +130,7 @@ private:
 
     QLocalSocket *m_socket = nullptr;
     QString m_socketPath;
+    QString m_daemonExecutable;
     QByteArray m_readBuffer;
 
     // 重连
@@ -137,11 +141,26 @@ private:
     bool m_autoReconnect = false;
 
     // daemon 自动拉起
+    bool m_restarting = false;
     bool m_daemonStartAttempted = false;  // 每次生命周期只尝试启动一次
 
     // 请求-响应匹配：按请求 id 精确匹配
     // daemon v3 会在响应顶层回带请求的 id 字段
-    QHash<quint64, ResponseCallback> m_pendingCallbacks;
+    struct PendingRequest {
+        ResponseCallback callback;
+        qint64 deadline;
+        bool immediateSync;
+        Daemon::ResponseType expected = Daemon::ResponseType::Unknown;
+    };
+    QHash<quint64, PendingRequest> m_pendingCallbacks;
+    QElapsedTimer m_clock;
+    QTimer *m_requestTimer = nullptr;
+    int m_requestTimeoutMs;
+
+    QHash<quint64, PendingRequest> takePendingRequests();
+    void resetConnection(const QString &code, const QString &message);
+    static void failRequests(const QHash<quint64, PendingRequest> &pending,
+                             const QString &code, const QString &message);
 
     // id 插入顺序：供旧 daemon（响应不带 id）时 FIFO 兜底
     QQueue<quint64> m_pendingOrder;
@@ -150,5 +169,6 @@ private:
     quint64 m_nextRequestId = 0;
 
     // 订阅后等待 immediate_sync 的 Status 响应
-    bool m_expectingImmediateStatus = false;
+    int m_expectedStatusCount = 0;
+    qint64 m_syncDeadline = 0;
 };

@@ -228,6 +228,10 @@
         <source>未找到匹配的壁纸</source>
         <translation>No matching wallpapers found</translation>
     </message>
+    <message>
+        <source>切换中…</source>
+        <translation>Switching…</translation>
+    </message>
 </context>
 <context>
     <name>NavBar</name>
@@ -564,6 +568,13 @@
         <location filename="../qml/main.qml" line="16"/>
         <source>LianWall</source>
         <translation>LianWall</translation>
+    </message>
+</context>
+<context>
+    <name>WallpaperController</name>
+    <message>
+        <source>The operation result could not be confirmed. Reconnecting to refresh the current wallpaper.</source>
+        <translation>The operation result could not be confirmed. Reconnecting to refresh the current wallpaper.</translation>
     </message>
 </context>
 </TS>

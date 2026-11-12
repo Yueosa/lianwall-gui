@@ -8,13 +8,15 @@
 #include <QDir>
 #include <QJsonArray>
 #include <QDebug>
+#include <QPointer>
 
 #include "Constants.h"
+#include "SettingsStorage.h"
 
 /// 创建指向 ~/.config/lianwall/gui.conf 的 QSettings
 static QSettings guiSettings()
 {
-    static const QString path = LianwallGui::Paths::configDir() + "/gui.conf";
+    const QString path = LianwallGui::Paths::guiSettingsFile();
     return QSettings(path, QSettings::IniFormat);
 }
 
@@ -34,6 +36,7 @@ ConfigManager::ConfigManager(DaemonClient *client, QObject *parent)
     connect(m_client, &DaemonClient::eventReceived,
             this, [this](const Daemon::DaemonEvent &event) {
         if (event.type == Daemon::EventType::ConfigChanged) {
+            ++m_revision;
             auto d = event.asConfigChanged();
             if (d.key == QLatin1String("all")) {
                 // ReloadConfig → 重新拉取全部
@@ -100,9 +103,16 @@ void ConfigManager::setLanguage(const QString &lang)
 
 void ConfigManager::onDaemonConnected(bool connected)
 {
-    if (connected) {
-        reload();
+    ++m_revision;
+    ++m_reloadGeneration;
+    m_reloadInFlight = false;
+    m_reloadPending = false;
+    if (m_configLoaded) {
+        m_configLoaded = false;
+        emit configLoadedChanged();
     }
+    if (connected)
+        reload();
 }
 
 void ConfigManager::reload()
@@ -110,22 +120,35 @@ void ConfigManager::reload()
     if (!m_client->isConnected())
         return;
 
-    m_client->getConfig(QString(), [this](const Daemon::Response &resp) {
-        if (resp.type == Daemon::ResponseType::Config) {
+    if (m_reloadInFlight) {
+        m_reloadPending = true;
+        return;
+    }
+    m_reloadInFlight = true;
+    m_reloadPending = false;
+    const quint64 generation = ++m_reloadGeneration;
+    const quint64 revision = m_revision;
+    const QPointer<ConfigManager> guard(this);
+    m_client->getConfig(QString(), [guard, generation, revision](const Daemon::Response &resp) {
+        if (!guard || generation != guard->m_reloadGeneration)
+            return;
+        const bool again = guard->m_reloadPending || revision != guard->m_revision;
+        guard->m_reloadInFlight = false;
+        guard->m_reloadPending = false;
+        if (!again && resp.type == Daemon::ResponseType::Config) {
             auto cfg = resp.asConfig();
             if (cfg.value.isObject()) {
-                applyFullConfig(cfg.value.toObject());
-                if (!m_configLoaded) {
-                    m_configLoaded = true;
-                    emit configLoadedChanged();
+                guard->applyFullConfig(cfg.value.toObject());
+                if (guard && !guard->m_configLoaded) {
+                    guard->m_configLoaded = true;
+                    emit guard->configLoadedChanged();
                 }
-                qDebug() << "[ConfigManager] Full config loaded";
             }
-        } else if (resp.type == Daemon::ResponseType::Error) {
-            auto err = resp.asError();
-            qWarning() << "[ConfigManager] GetConfig error:" << err.message;
-            emit errorOccurred(err.message);
+        } else if (!again && resp.type == Daemon::ResponseType::Error) {
+            emit guard->errorOccurred(resp.asError().message);
         }
+        if (guard && again && guard->m_client->isConnected())
+            guard->reload();
     });
 }
 
@@ -189,8 +212,8 @@ void ConfigManager::applyFullConfig(const QJsonObject &config)
         if (m_imageOutputs != v) { m_imageOutputs = v; emit imageOutputsChanged(); }
     }
     {
-        auto v = jsonArrayToStringList(image["swww_args"]);
-        if (m_swwwArgs != v) { m_swwwArgs = v; emit swwwArgsChanged(); }
+        auto v = jsonArrayToStringList(image["awww_args"]);
+        if (m_awwwArgs != v) { m_awwwArgs = v; emit awwwArgsChanged(); }
     }
 
     // --- vram ---
@@ -243,7 +266,7 @@ void ConfigManager::applySingleKey(const QString &key, const QJsonValue &value)
     else if (key == QLatin1String("video_engine.mpv_args"))   { auto v = jsonArrayToStringList(value); if (m_mpvArgs != v) { m_mpvArgs = v; emit mpvArgsChanged(); } }
     else if (key == QLatin1String("image_engine.interval"))   { auto v = value.toInt(); if (m_imageInterval != v) { m_imageInterval = v; emit imageIntervalChanged(); } }
     else if (key == QLatin1String("image_engine.outputs"))    { auto v = value.toString(); if (m_imageOutputs != v) { m_imageOutputs = v; emit imageOutputsChanged(); } }
-    else if (key == QLatin1String("image_engine.swww_args"))  { auto v = jsonArrayToStringList(value); if (m_swwwArgs != v) { m_swwwArgs = v; emit swwwArgsChanged(); } }
+    else if (key == QLatin1String("image_engine.awww_args"))  { auto v = jsonArrayToStringList(value); if (m_awwwArgs != v) { m_awwwArgs = v; emit awwwArgsChanged(); } }
     else if (key == QLatin1String("vram.enabled"))            { auto v = value.toBool(); if (m_vramEnabled != v) { m_vramEnabled = v; emit vramEnabledChanged(); } }
     else if (key == QLatin1String("vram.threshold_percent"))  { auto v = value.toDouble(); if (qAbs(m_vramThreshold - v) > 0.01) { m_vramThreshold = v; emit vramThresholdChanged(); } }
     else if (key == QLatin1String("vram.recovery_percent"))   { auto v = value.toDouble(); if (qAbs(m_vramRecovery - v) > 0.01) { m_vramRecovery = v; emit vramRecoveryChanged(); } }
@@ -268,17 +291,22 @@ void ConfigManager::sendSetConfig(const QString &key, const QJsonValue &value)
         return;
     }
 
-    m_client->setConfig(key, value, [this, key](const Daemon::Response &resp) {
+    const QPointer<ConfigManager> guard(this);
+    m_client->setConfig(key, value, [guard, key](const Daemon::Response &resp) {
+        if (!guard)
+            return;
         if (resp.type == Daemon::ResponseType::Error) {
             auto err = resp.asError();
             qWarning() << "[ConfigManager] SetConfig failed:" << key << err.message;
-            emit errorOccurred(err.message);
+            emit guard->errorOccurred(err.message);
+            if (guard && guard->m_client->isConnected())
+                guard->reload();
         }
     });
 }
 
 // ============================================================================
-// QML 可调用的写操作（每个都先乐观更新本地缓存，然后发送请求）
+// QML 可调用的写操作（发送请求后由权威配置事件/快照更新本地缓存）
 // ============================================================================
 
 void ConfigManager::setMode(const QString &mode)
@@ -322,11 +350,11 @@ void ConfigManager::setImageOutputs(const QString &outputs)
     sendSetConfig("image_engine.outputs", outputs);
 }
 
-void ConfigManager::setSwwwArgs(const QStringList &args)
+void ConfigManager::setAwwwArgs(const QStringList &args)
 {
     QJsonArray arr;
     for (const auto &a : args) arr.append(a);
-    sendSetConfig("image_engine.swww_args", arr);
+    sendSetConfig("image_engine.awww_args", arr);
 }
 
 void ConfigManager::setVramEnabled(bool enabled)
@@ -407,10 +435,10 @@ void ConfigManager::openDirectory(const QString &path)
 
 QString ConfigManager::configDirPath() const
 {
-    return QDir::homePath() + QStringLiteral("/.config/lianwall");
+    return LianwallGui::Paths::configDir();
 }
 
 QString ConfigManager::cacheDirPath() const
 {
-    return QDir::homePath() + QStringLiteral("/.cache/lianwall");
+    return LianwallGui::Paths::cacheDir();
 }

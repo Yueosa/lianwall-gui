@@ -35,12 +35,9 @@ echo "   构建目录: ${BUILD_DIR}"
 echo "   产物目录: ${ARTIFACT_DIR}"
 echo ""
 
-# CMake 配置（仅首次或 CMakeLists.txt 变更时需要）
-if [[ ! -f "${BUILD_DIR}/CMakeCache.txt" ]]; then
-    echo "📦 CMake 配置..."
-    cmake -S "${SCRIPT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
-    echo ""
-fi
+# 每次明确配置 Release，避免复用 Debug cache 后误标发行构建。
+echo "📦 CMake 配置..."
+cmake -S "${SCRIPT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release -DLIANWALL_BUILD_TESTS=OFF
 
 # 编译
 echo "⚙️  编译中..."

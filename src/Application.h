@@ -22,11 +22,12 @@ class DaemonState;
 class ConfigManager;
 class WallpaperListModel;
 class WallpaperFilterModel;
+class WallpaperController;
 
 class Application : public QObject {
     Q_OBJECT
 
-    /// 壁纸/模式切换进行中（点击后为 true，成功事件或真实错误后清除）
+    /// 壁纸/模式切换进行中（点击后为 true，匹配回执或连接错误后清除）
     Q_PROPERTY(bool wallpaperSwitching READ wallpaperSwitching NOTIFY wallpaperSwitchingChanged)
 
 public:
@@ -34,14 +35,14 @@ public:
     ~Application();
 
     /// 完整初始化（在单实例检测通过后调用）
-    void init();
+    void init(const QString &socketPath = QString());
 
     int exec();
 
     DaemonClient* daemonClient() const { return m_daemonClient; }
     DaemonState*  daemonState()  const { return m_daemonState; }
     ConfigManager* configManager() const { return m_configManager; }
-    bool wallpaperSwitching() const { return m_wallpaperCommandInFlight; }
+    bool wallpaperSwitching() const;
 
 public slots:
     /// 显示主窗口（从托盘恢复）
@@ -74,15 +75,12 @@ signals:
     void wallpaperSwitchingChanged();
 
 private:
-    void initComponents();
+    void initComponents(const QString &socketPath);
     void initSystemTray();
     void registerQmlTypes();
     void loadTranslations();
     void doFinalQuit();
     void updateTrayModeAction();
-    void finishWallpaperCommand();
-    void armWallpaperCommandGuard();
-    void handleWallpaperCommandResponse(const Daemon::Response &r, const char *op);
 
     // 托盘图标点击处理
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
@@ -96,6 +94,7 @@ private:
     DaemonClient *m_daemonClient;
     DaemonState  *m_daemonState;
     ConfigManager *m_configManager;
+    WallpaperController *m_wallpaperController = nullptr;
 
     // 壁纸模型
     WallpaperListModel  *m_wallpaperModel;
@@ -105,6 +104,5 @@ private:
     QSystemTrayIcon *m_trayIcon;
     QMenu *m_trayMenu;
     QAction *m_trayModeAction = nullptr;
-    bool m_wallpaperCommandInFlight = false;
     bool m_lockCommandInFlight = false;
 };
