@@ -4,7 +4,7 @@
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-[![Version](https://img.shields.io/badge/version-1.4.4-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
 [![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
 [![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
@@ -110,7 +110,7 @@ lianwall-gui
 lianwall-gui (Qt6/QML)
     │
     ├── DaemonClient ──── Unix Socket ──── lianwalld (Rust)
-    │     (QLocalSocket)    JSON V2         (/tmp/lianwall.sock)
+    │     (QLocalSocket)    JSON V3         (/tmp/lianwall.sock)
     │
     ├── DaemonState ────── 事件订阅 ────── WallpaperChanged
     │                                       ConfigChanged
@@ -163,3 +163,47 @@ LianWall License — 详见 [LICENSE](LICENSE) 文件
 ## 👤 作者
 
 **Lian** ([Yueosa](https://github.com/Yueosa))
+
+## 开发回归测试
+
+Qt Test 为可选构建依赖，正常构建无需安装。启用测试后，可使用临时模拟 Unix socket
+验证超时、重连、请求匹配、操作状态和图库快照；测试不启动壁纸引擎。
+
+```sh
+cmake -S . -B build-tests -DLIANWALL_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-tests -j
+ctest --test-dir build-tests --output-on-failure
+```
+
+
+首次连接找不到 daemon 时，GUI 会尝试拉起一次；成功连接过之后，断线仅尝试重连，不会自动重启已停止的 daemon。
+
+## 本地设置与缩略图缓存
+
+GUI 设置存放于 `$XDG_CONFIG_HOME/lianwall/gui.conf`（默认 `~/.config/lianwall/gui.conf`）。
+自定义 XDG 路径且新文件不存在时，自动原子复制旧 HOME 路径的设置，保留原文件；复制失败则继续使用旧文件并记录警告。
+缩略图位于 `$XDG_CACHE_HOME/lianwall/thumbnails`（默认 `~/.cache/lianwall/thumbnails`），设置页显示同一路径。
+
+新版缓存键包含源文件路径、大小与修改/元数据时间；刷新后重新检查源文件，损坏缓存自动重新生成。
+同键并发请求共享生成结果，JPEG 原子保存；磁盘写入失败记录警告，仍显示内存中的图片。
+新版 `v2_*.jpg` 缓存按最旧写入时间清理，软上限 512 MiB / 4096 项；首次访问、每 64 次访问或间隔 60 秒检查，允许短时超限。
+旧 Qt 应用缓存目录暂不自动清理，不删除原始壁纸、权重或用户设置。
+测试还覆盖取消等待、运行中视频任务退出及缓存写入失败；大图库滚动观感仍需图形会话实测。
+
+静态引擎配置统一使用 `image_engine.awww_args`；本版 GUI 需与支持该键的 daemon 配套升级，
+不再发送旧 `swww_args`。旧 TOML 的备份与迁移由 daemon/core 负责，详见主仓库 README。
+
+### 自定义 daemon socket 与重启
+
+配置了自定义 `daemon.socket_path` 时，以相同路径启动 GUI：
+
+```bash
+lianwall-gui --socket /run/user/1000/lianwall.sock
+```
+
+默认路径仍为 `/tmp/lianwall.sock`；`--socket` 支持绝对/相对路径与 `~/`，按端点区分 GUI 单实例。
+托盘重启先取得 Shutdown 回执，再等待旧 socket 释放（最多 15 秒）后启动新 daemon；启动成功表示进程已发起，连接状态随后确认就绪。
+设置查询会合并并丢弃被新事件淘汰的旧快照，断线后重置加载状态；销毁配置对象不会接收迟到回调。
+通信请求每帧最多 1 MiB，超过时本地拒绝；响应每帧最多 64 MiB，超过时断线重同步。
+
+本版 GUI 1.6.0 请配套 daemon/CLI 5.6.0，旧配置键已迁移。当前主要维护 Linux/Hyprland，其他桌面环境未经完整验证，不承诺全 Wayland 兼容。自研渲染属于后续 6.0.0 计划。
