@@ -4,7 +4,7 @@
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
 [![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
 [![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
@@ -13,9 +13,10 @@ Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态�
 
 > **lianwalld 守护进程的图形化客户端** 🎯
 > - 通过 **Unix Socket** 直连 daemon，实时事件驱动
-> - **仪表盘** — 当前壁纸预览、快捷操作、显存监控
-> - **壁纸库** — 网格浏览、缩略图预览
-> - **设置** — 主题切换、语言切换、VRAM 自定义后端配置
+> - **正在播放** — 当前壁纸、轮换控制、引擎与显存状态
+> - **壁纸库** — 搜索、时间/使用排序、收藏与缩略图
+> - **引擎与自动化** — 内置/外部引擎配置、运行诊断与真实Hook规则
+> - **设置** — 主题与语言、显存测试、服务日志查看/导出
 > - **系统托盘** — 后台驻留，关闭窗口 ≠ 退出
 > - **中/英双语** — 运行时切换，即时生效
 
@@ -23,7 +24,27 @@ Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态�
 
 ---
 
-## 📸 界面预览
+## 2.0 界面
+
+2.0.0采用重写后的桌面界面，配套lianwalld6.0.0。下方标注旧版的截图仅供历史参考。原生Qt Quick界面采用顶部“正在播放 / 壁纸库 / 引擎 / 自动化 / 设置”五页、持续显示的轮换控制栏和浅深主题。新图标来自仓库根目录提供的PNG原图。默认窗口1280×720，合成器平铺规则可改变实际尺寸；首页预览保持横屏比例，轮换间隔统一在设置页调整。
+
+壁纸库支持同时浏览图片/视频、名称或目录搜索、修改时间排序，以及新daemon提供的收藏、首次发现/最近使用/成功切换次数/驻留时长排序。收藏与排除轮换相互独立；收藏必须收到保存回执后才更新，失败保留原值。资料由daemon保存到XDG数据目录，清理GUI缩略图不会丢失。文件移动/重命名视为新条目，不自动迁移原资料；统计从启用后开始，驻留时长并非观看时长。
+
+旧daemon缺少`GetLibrary`时仍可浏览/控制壁纸，收藏与统计功能不可用并显示原因。引擎页区分配置偏好与实际后端/解码器、准备状态、回退和错误；Hook页读取真实规则、重载和打开配置。设置输入支持Enter提交、Esc取消和保存错误提示。
+
+显存测试已接入真实API，可测试未保存命令并查看读数、输出和错误；测试不改变保存配置或监控状态。日志页支持最近服务日志、按最低级别筛选、打开日志目录和导出当前记录，显示实际过滤器及`RUST_LOG`覆盖。daemon文件日志按2MiB轮转，界面最多显示128条；不收集GUI自身Qt日志。导出为用户选择路径的UTF-8文件，权限0600，保存失败保留目标原文件。
+
+已补齐外部引擎参数、mpv IPC路径、内置过渡帧率、启动模式和算法参数。参数编辑器一行对应一个argv元素，空格、引号、空参数和中文按原样保存，不使用shell拆词。图片外部动画通过awww参数配置；外部mpvpaper淡入时长固定0.4秒，内置动画才使用时长与帧率选项。启动模式不直接切换当前会话。
+
+引擎页根据daemon报告的可执行文件发现结果，禁用未安装的外部后端并显示提示；此检测不代表设备和播放兼容性验证。内置视频需要明确的单个目标输出，软解与硬解都遵守这一要求。
+
+桌面菜单通过`lianwall-gui --show`打开窗口；直接运行默认进入托盘。安装将PNG图标放在`share/pixmaps`，许可证放在`share/licenses/lianwall-gui`。
+
+英语翻译目录已补齐，切换语言同时更新QML与托盘，并使用系统Qt翻译（安装时可用）本地化标准控件。布局为英语标签保留空间。输入框显示服务确认后的规范化值，算法参数保留小数。`daemon.socket_path`/`pid_path`仍通过配置文件或CLI调整，避免在GUI中把当前连接与下次启动路径混淆；算法策略目前只有一种，不提供无意义选择。
+
+Hook编辑/运行历史与真实服务完整交互验收仍在推进，不能将当前界面视作所有功能完成。默认启动仍为后台托盘；`lianwall-gui --show`可直接打开主窗口。
+
+## 📸 1.6 界面预览
 
 | 仪表盘 | 壁纸库 |
 |:------:|:------:|
@@ -65,7 +86,7 @@ sudo cmake --install build
 
 | 包 | 说明 |
 |----|------|
-| Qt 6 (Core, Gui, Widgets, Quick, QuickControls2, Network) | GUI 框架 |
+| Qt 6 (Core, Gui, Widgets, Quick, QuickControls2, Network) | GUI 框架；当前本机构建二进制要求Qt 6.12 |
 | ffmpeg | 视频缩略图提取 |
 | [lianwall](https://github.com/Yueosa/lianwall) ≥ 5.5.1 | 守护进程 (lianwalld) |
 
@@ -74,7 +95,7 @@ sudo cmake --install build
 | 包 | 说明 |
 |----|------|
 | CMake ≥ 3.16 | 构建系统 |
-| Qt6 开发包 | 含 LinguistTools |
+| Qt6 ≥ 6.10 开发包 | 含 LinguistTools；过滤器使用Qt 6.10 API |
 | C++17 编译器 | GCC ≥ 9 / Clang ≥ 10 |
 
 ---
@@ -82,8 +103,11 @@ sudo cmake --install build
 ## 🚀 使用
 
 ```bash
-# 直接运行
+# 后台托盘启动
 lianwall-gui
+
+# 启动并显示主窗口
+lianwall-gui --show
 
 # 或从编译目录
 ./build/lianwall-gui
@@ -97,10 +121,13 @@ lianwall-gui
 
 | 页面 | 功能 |
 |------|------|
-| **🏠 仪表盘** | 当前壁纸预览 + 状态信息 + 快捷操作 + 倒计时进度条 + 显存监控 |
-| **📚 壁纸库** | 网格视图浏览壁纸，搜索筛选（全部/已锁定/未锁定），点击查看详情 |
-| **⚙️ 设置** | 路径与模式、动态壁纸引擎(mpvpaper)、静态壁纸引擎(awww)、显存监控(VRAM 含自定义后端)、守护进程、界面设置 |
-| **ℹ️ 关于** | 版本信息、源代码链接、主题色说明 |
+| **正在播放** | 当前媒体预览、轮换与倒计时、引擎/显存/自动化摘要 |
+| **壁纸库** | 图片/视频合并浏览、搜索/筛选/排序、收藏、排除轮换、双击播放 |
+| **引擎** | 内置/外部后端、输出/解码/动画、外部argv与IPC、实际运行诊断 |
+| **自动化** | Hook规则、条件、命令与状态，打开配置、重载与详情 |
+| **设置** | 轮换/路径/启动偏好/算法、外观/语言、显存测试、服务日志 |
+
+顶部居中Tab可用Alt+1…5切换；“关于”位于应用菜单。窗口关闭后继续驻留托盘，“退出GUI与服务”才会关闭两者。
 
 ---
 
@@ -144,13 +171,13 @@ lianwall-gui (Qt6/QML)
 
 ## 🎨 主题色
 
-主题色取自跨性别骄傲旗配色，纯粹因为作者喜欢这些颜色：
+提供浅色/深色主题及三种强调色，设置后立即生效：
 
-| 色彩 | 色值 | 用途 |
-|------|------|------|
-| 🔵 Blue | `#5BCEFA` | 强调色 — 按钮、链接、高亮 |
-| 🩷 Pink | `#F5A9B8` | 主色 — 重要元素、选中状态 |
-| ⚪ White | `#FFFFFF` | 亮面 — 反差、高亮 |
+| 强调色 | 浅色主题 | 深色主题 |
+|--------|----------|----------|
+| 鸢尾（默认） | `#79558f` | `#d3b4ea` |
+| 樱粉 | `#a45f78` | `#f0b3ca` |
+| 天空 | `#46758e` | `#a5d1e9` |
 
 ---
 
@@ -168,6 +195,7 @@ LianWall License — 详见 [LICENSE](LICENSE) 文件
 
 Qt Test 为可选构建依赖，正常构建无需安装。启用测试后，可使用临时模拟 Unix socket
 验证超时、重连、请求匹配、操作状态和图库快照；测试不启动壁纸引擎。
+`settings`测试使用离屏Qt Quick真实控件，验证Enter/Esc与焦点、输入验证、小数和规范化目录显示、参数原样传递/失败草稿，以及翻译完整性与占位符。默认三套CTest均在临时目录运行。
 
 ```sh
 cmake -S . -B build-tests -DLIANWALL_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -206,4 +234,6 @@ lianwall-gui --socket /run/user/1000/lianwall.sock
 设置查询会合并并丢弃被新事件淘汰的旧快照，断线后重置加载状态；销毁配置对象不会接收迟到回调。
 通信请求每帧最多 1 MiB，超过时本地拒绝；响应每帧最多 64 MiB，超过时断线重同步。
 
-本版 GUI 1.6.0 请配套 daemon/CLI 5.6.0，旧配置键已迁移。当前主要维护 Linux/Hyprland，其他桌面环境未经完整验证，不承诺全 Wayland 兼容。自研渲染属于后续 6.0.0 计划。
+本版GUI2.0.0请配套daemon/CLI6.0.0，旧配置键按既有规则迁移。主要维护作者本机Linux/Hyprland，其他桌面环境未经完整验证；内置引擎支持范围与系统库要求见daemon6.0.0发行说明。
+
+开发或便携运行时可用`lianwall-gui --show --daemon-executable /absolute/path/to/lianwalld`固定自动启动及菜单重启所使用的daemon；也支持`LIANWALL_DAEMON_EXECUTABLE`环境变量。指定路径无效时失败，不静默回退到系统旧版本。此选项不替换已经运行的服务，升级预览前需先停止旧服务。SIGTERM/SIGINT仅退出GUI，壁纸服务继续运行；菜单“退出GUI与服务”才显式停止两者。
