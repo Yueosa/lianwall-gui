@@ -1,4 +1,7 @@
+#include "FrontendState.h"
 #include "Application.h"
+#include <QLibraryInfo>
+#include <QLocale>
 #include "ConfigManager.h"
 #include "Constants.h"
 #include "DaemonClient.h"
@@ -97,6 +100,7 @@ void Application::initComponents(const QString &socketPath)
 
     // 配置管理（通过 DaemonClient 读写 daemon 配置）
     m_configManager = new ConfigManager(m_daemonClient, this);
+    connect(m_configManager, &ConfigManager::languageChanged, this, &Application::switchLanguage);
 
     // 壁纸库 / 配置错误统一上屏（此前只打日志，用户看不到）
     connect(m_wallpaperModel, &WallpaperListModel::errorOccurred,
@@ -114,6 +118,15 @@ void Application::initComponents(const QString &socketPath)
         emit m_daemonState->daemonError(QStringLiteral("config"), message, true);
     });
 
+    m_frontend = new FrontendState(m_daemonClient, this);
+    connect(m_wallpaperModel, &WallpaperListModel::metadataChanged, m_frontend, [this]() {
+        if (m_wallpaperModel->metadataAvailable()) m_frontend->enableLibraryEvents();
+    });
+
+    connect(m_frontend, &FrontendState::businessRefreshRequested, m_daemonState, &DaemonState::refresh);
+    connect(m_frontend, &FrontendState::operationError, this, [this](const QString &message) {
+        emit m_daemonState->daemonError(QStringLiteral("operation"), message, true);
+    });
     // 启动连接
     m_daemonClient->connectToDaemon();
 }
@@ -124,11 +137,13 @@ void Application::initSystemTray()
     m_trayMenu = new QMenu();
 
     auto *showAction = m_trayMenu->addAction(tr("🌀 显示/隐藏"));
+    showAction->setProperty("translationSource", QByteArray("🌀 显示/隐藏"));
     connect(showAction, &QAction::triggered, this, &Application::toggleMainWindow);
 
     m_trayMenu->addSeparator();
 
     auto *nextAction = m_trayMenu->addAction(tr("▶️ 下一张"));
+    nextAction->setProperty("translationSource", QByteArray("▶️ 下一张"));
     connect(nextAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Next clicked, connected:" << m_daemonClient->isConnected();
         if (m_daemonClient->isConnected())
@@ -136,6 +151,7 @@ void Application::initSystemTray()
     });
 
     auto *prevAction = m_trayMenu->addAction(tr("◀️ 上一张"));
+    prevAction->setProperty("translationSource", QByteArray("◀️ 上一张"));
     connect(prevAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Prev clicked, connected:" << m_daemonClient->isConnected();
         if (m_daemonClient->isConnected())
@@ -159,6 +175,7 @@ void Application::initSystemTray()
     m_trayMenu->addSeparator();
 
     auto *restartAction = m_trayMenu->addAction(tr("🔄 重启 Daemon"));
+    restartAction->setProperty("translationSource", QByteArray("🔄 重启 Daemon"));
     connect(restartAction, &QAction::triggered, this, [this]() {
         qDebug() << "[Tray] Restart daemon requested";
         if (m_daemonClient->isConnected()) {
@@ -171,7 +188,8 @@ void Application::initSystemTray()
 
     m_trayMenu->addSeparator();
 
-    auto *quitAction = m_trayMenu->addAction(tr("♥️ 退出"));
+    auto *quitAction = m_trayMenu->addAction(tr("退出 GUI 与服务"));
+    quitAction->setProperty("translationSource", QByteArray("退出 GUI 与服务"));
     connect(quitAction, &QAction::triggered, this, &Application::quit);
 
     // --- 托盘图标 ---
@@ -200,6 +218,19 @@ void Application::switchLanguage(const QString &lang)
         m_translator = nullptr;
     }
 
+    for (auto *translator : m_frameworkTranslators) {
+        m_app->removeTranslator(translator);
+        delete translator;
+    }
+    m_frameworkTranslators.clear();
+    QLocale::setDefault(QLocale(lang));
+    for (const auto &module : {"qtbase", "qtdeclarative"}) {
+        auto *translator = new QTranslator(this);
+        if (translator->load(QString::fromLatin1(module) + '_' + lang, QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+            m_app->installTranslator(translator);
+            m_frameworkTranslators.append(translator);
+        } else delete translator;
+    }
     m_translator = new QTranslator(this);
     if (m_translator->load(QStringLiteral(":/translations/lianwall-gui_%1.qm").arg(lang))) {
         m_app->installTranslator(m_translator);
@@ -212,6 +243,13 @@ void Application::switchLanguage(const QString &lang)
 
     if (m_engine)
         m_engine->retranslate();
+    if (m_trayMenu) {
+        for (auto *action : m_trayMenu->actions()) {
+            const auto source = action->property("translationSource").toByteArray();
+            if (!source.isEmpty()) action->setText(QCoreApplication::translate("Application", source.constData()));
+        }
+        updateTrayModeAction();
+    }
 }
 
 void Application::registerQmlTypes()
@@ -219,6 +257,7 @@ void Application::registerQmlTypes()
     auto *ctx = m_engine->rootContext();
 
     // 核心组件暴露给 QML
+    ctx->setContextProperty("Frontend", m_frontend);
     ctx->setContextProperty("DaemonState", m_daemonState);
     ctx->setContextProperty("ConfigManager", m_configManager);
 
@@ -317,6 +356,16 @@ void Application::toggleMainWindow()
         bool visible = root->property("visible").toBool();
         visible ? hideMainWindow() : showMainWindow();
     }
+}
+
+void Application::quitGui()
+{
+    if (m_quitting) return;
+    m_quitting = true;
+    emit aboutToQuit();
+    m_trayIcon->hide();
+    m_daemonClient->setAutoReconnect(false);
+    doFinalQuit();
 }
 
 void Application::quit()

@@ -80,7 +80,7 @@ private:
 // ThumbnailResponse — 单个缩略图异步响应
 // ============================================================================
 
-class ThumbnailResponse : public QQuickImageResponse, public QRunnable
+class ThumbnailResponse : public QQuickImageResponse
 {
 public:
     ThumbnailResponse(const QString &path, const QSize &requestedSize,
@@ -91,7 +91,7 @@ public:
     QQuickTextureFactory *textureFactory() const override;
     QString errorString() const override;
     void cancel() override;
-    void run() override;
+    void run();
 
 private:
     QImage loadImage() const;

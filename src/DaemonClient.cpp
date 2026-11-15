@@ -18,7 +18,7 @@ DaemonClient::DaemonClient(QObject *parent, int requestTimeoutMs, QString daemon
     : QObject(parent)
     , m_socket(new QLocalSocket(this))
     , m_socketPath(QStringLiteral("/tmp/lianwall.sock"))
-    , m_daemonExecutable(std::move(daemonExecutable))
+    , m_daemonExecutable(daemonExecutable.isEmpty() ? LianwallGui::Paths::findLianwalld() : std::move(daemonExecutable))
     , m_reconnectTimer(new QTimer(this))
     , m_requestTimer(new QTimer(this))
     , m_requestTimeoutMs(qMax(1, requestTimeoutMs))
@@ -151,6 +151,7 @@ QHash<quint64, DaemonClient::PendingRequest> DaemonClient::takePendingRequests()
     m_pendingOrder.clear();
     m_readBuffer.clear();
     m_expectedStatusCount = 0;
+    m_expectedEngineCount = 0;
     m_syncDeadline = 0;
     m_requestTimer->stop();
     return pending;
@@ -181,12 +182,12 @@ void DaemonClient::resetConnection(const QString &code, const QString &message)
 void DaemonClient::checkRequestTimeouts()
 {
     const qint64 now = m_clock.elapsed();
-    bool expired = m_expectedStatusCount > 0 && now >= m_syncDeadline;
+    bool expired = (m_expectedStatusCount > 0 || m_expectedEngineCount > 0) && now >= m_syncDeadline;
     for (const auto &request : std::as_const(m_pendingCallbacks))
         expired = expired || now >= request.deadline;
     if (expired) {
         resetConnection(QStringLiteral("timeout"), QStringLiteral("Request timed out; operation result may be unknown"));
-    } else if (m_pendingCallbacks.isEmpty() && m_expectedStatusCount == 0) {
+    } else if (m_pendingCallbacks.isEmpty() && m_expectedStatusCount == 0 && m_expectedEngineCount == 0) {
         m_requestTimer->stop();
     }
 }
@@ -263,6 +264,12 @@ void DaemonClient::sendRequest(const QByteArray &data, ResponseCallback cb)
     const bool sync = command == QLatin1String("Subscribe")
         && obj.value(QStringLiteral("immediate_sync")).toBool();
     static const QHash<QString, Daemon::ResponseType> queryTypes = {
+        {QStringLiteral("GetEngineInfo"), Daemon::ResponseType::EngineInfo},
+        {QStringLiteral("GetOutputs"), Daemon::ResponseType::Outputs},
+        {QStringLiteral("ListHooks"), Daemon::ResponseType::HookList},
+        {QStringLiteral("GetLibrary"), Daemon::ResponseType::Library},
+        {QStringLiteral("TestVram"), Daemon::ResponseType::VramTest},
+        {QStringLiteral("GetLogs"), Daemon::ResponseType::Logs},
         {QStringLiteral("Ping"), Daemon::ResponseType::Pong},
         {QStringLiteral("GetStatus"), Daemon::ResponseType::Status},
         {QStringLiteral("GetSpace"), Daemon::ResponseType::Space},
@@ -273,7 +280,7 @@ void DaemonClient::sendRequest(const QByteArray &data, ResponseCallback cb)
         {QStringLiteral("Unsubscribe"), Daemon::ResponseType::Unsubscribed},
     };
     const auto expected = queryTypes.value(command, Daemon::ResponseType::Ok);
-    m_pendingCallbacks.insert(id, PendingRequest{std::move(cb), m_clock.elapsed() + timeout, sync, expected});
+    m_pendingCallbacks.insert(id, PendingRequest{std::move(cb), m_clock.elapsed() + timeout, sync, expected, sync && obj.value(QStringLiteral("events")).toArray().contains(QStringLiteral("engine_changed"))});
     m_pendingOrder.enqueue(id);
     if (!m_requestTimer->isActive())
         m_requestTimer->start();
@@ -305,6 +312,11 @@ void DaemonClient::processLine(const QByteArray &line)
     const qint64 wireId = hasId ? root.value(QStringLiteral("id")).toInteger(-1) : 0;
     if (wireId < 0) {
         resetConnection(QStringLiteral("protocol_error"), QStringLiteral("Invalid response id"));
+        return;
+    }
+    if (response.type == Daemon::ResponseType::EngineInfo && wireId == 0 && hasId) {
+        if (m_expectedEngineCount > 0) --m_expectedEngineCount;
+        emit initialEngineInfoReceived(response.payload);
         return;
     }
     // A tagged GetStatus response must never be consumed as initial subscription sync.
@@ -345,6 +357,7 @@ void DaemonClient::processLine(const QByteArray &line)
     m_pendingCallbacks.remove(id);
     if (response.type == Daemon::ResponseType::Subscribed && request.immediateSync) {
         ++m_expectedStatusCount;
+        if (request.engineSync) ++m_expectedEngineCount;
         m_syncDeadline = m_clock.elapsed() + m_requestTimeoutMs;
     }
     if (request.callback)
@@ -382,6 +395,13 @@ bool DaemonClient::tryStartDaemon()
 // ============================================================================
 // Query API
 // ============================================================================
+
+void DaemonClient::query(const QString &command, const QJsonObject &fields, ResponseCallback cb)
+{
+    QJsonObject request = fields;
+    request.insert(QStringLiteral("cmd"), command);
+    sendRequest(QJsonDocument(request).toJson(QJsonDocument::Compact), std::move(cb));
+}
 
 void DaemonClient::ping(ResponseCallback cb)
 {

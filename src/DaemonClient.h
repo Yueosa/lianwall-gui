@@ -60,6 +60,7 @@ public:
     /// 回调类型：响应到达时调用
     using ResponseCallback = std::function<void(const Daemon::Response &)>;
 
+    void query(const QString &command, const QJsonObject &fields = {}, ResponseCallback cb = nullptr);
     void ping(ResponseCallback cb = nullptr);
     void getStatus(ResponseCallback cb = nullptr);
     void getSpace(std::optional<Daemon::WallMode> mode = std::nullopt,
@@ -105,6 +106,7 @@ signals:
     void eventReceived(const Daemon::DaemonEvent &event);
 
     /// 收到 immediate_sync 的初始 Status
+    void initialEngineInfoReceived(const QJsonObject &info);
     void initialStatusReceived(const Daemon::StatusPayload &status);
 
     /// 连接错误
@@ -151,6 +153,7 @@ private:
         qint64 deadline;
         bool immediateSync;
         Daemon::ResponseType expected = Daemon::ResponseType::Unknown;
+        bool engineSync = false;
     };
     QHash<quint64, PendingRequest> m_pendingCallbacks;
     QElapsedTimer m_clock;
@@ -170,5 +173,6 @@ private:
 
     // 订阅后等待 immediate_sync 的 Status 响应
     int m_expectedStatusCount = 0;
+    int m_expectedEngineCount = 0;
     qint64 m_syncDeadline = 0;
 };

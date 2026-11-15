@@ -8,6 +8,7 @@
 #include <QImage>
 #include <QUrl>
 #include <QScopeGuard>
+#include <QThread>
 
 class TestThumbnail : public QObject
 {
@@ -61,6 +62,31 @@ private slots:
         qputenv("XDG_CONFIG_HOME", originalConfig);
         QDir(directory.path() + "/cache").removeRecursively();
         QDir(directory.path() + "/config").removeRecursively();
+    }
+
+    void completionRunsOnOwnerThreadEvenForCancelledAndCachedJobs()
+    {
+        const QString path = source("owner-thread.png", Qt::blue);
+        QVERIFY(!thumbnail(path).isNull());
+        for (int batch = 0; batch < 10; ++batch) {
+            std::atomic_int completed{0};
+            std::atomic_bool wrongThread{false};
+            QList<ThumbnailResponse *> responses;
+            for (int index = 0; index < 30; ++index) {
+                auto *response = new ThumbnailResponse(QString::fromLatin1(QUrl::toPercentEncoding(path)), QSize(64,64), &pool, &semaphore, memory, work);
+                connect(response, &QQuickImageResponse::finished, this, [&, response]() {
+                    if (QThread::currentThread() != response->thread()) wrongThread.store(true);
+                    ++completed;
+                    response->deleteLater();
+                }, Qt::DirectConnection);
+                if (index % 2) response->cancel();
+                responses.append(response);
+            }
+            QVERIFY(pool.waitForDone(5000));
+            QTRY_COMPARE(completed.load(), responses.size());
+            QVERIFY(!wrongThread.load());
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        }
     }
 
     void replacedOrDeletedSourceDoesNotReturnOldMemoryImage()

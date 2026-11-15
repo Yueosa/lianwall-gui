@@ -70,7 +70,7 @@ void ConfigManager::setTheme(const QString &theme)
 QString ConfigManager::accentColor() const
 {
     auto settings = guiSettings();
-    return settings.value("app/accentColor", "blue").toString();
+    return settings.value("app/accentColor", "iris").toString();
 }
 
 void ConfigManager::setAccentColor(const QString &accent)
@@ -167,6 +167,8 @@ static QStringList jsonArrayToStringList(const QJsonValue &val) {
 
 void ConfigManager::applyFullConfig(const QJsonObject &config)
 {
+    m_document = config;
+    emit documentChanged();
     // --- paths ---
     auto paths = config["paths"].toObject();
     {
@@ -257,6 +259,12 @@ void ConfigManager::applyFullConfig(const QJsonObject &config)
 
 void ConfigManager::applySingleKey(const QString &key, const QJsonValue &value)
 {
+    const auto parts = key.split('.');
+    if (parts.size() == 2) {
+        auto section = m_document.value(parts[0]).toObject();
+        section.insert(parts[1], value); m_document.insert(parts[0], section);
+        emit documentChanged();
+    }
     if      (key == QLatin1String("paths.mode"))              { auto v = value.toString(); if (m_mode != v) { m_mode = v; emit modeChanged(); } }
     else if (key == QLatin1String("paths.video_dir"))         { auto v = value.toString(); if (m_videoDir != v) { m_videoDir = v; emit videoDirChanged(); } }
     else if (key == QLatin1String("paths.image_dir"))         { auto v = value.toString(); if (m_imageDir != v) { m_imageDir = v; emit imageDirChanged(); } }
@@ -284,24 +292,38 @@ void ConfigManager::applySingleKey(const QString &key, const QJsonValue &value)
 // SetConfig 发送
 // ============================================================================
 
+QVariant ConfigManager::value(const QString &key, const QVariant &fallback) const
+{
+    const auto parts = key.split('.');
+    if (parts.size() != 2) return fallback;
+    const auto value = m_document.value(parts[0]).toObject().value(parts[1]);
+    return value.isUndefined() ? fallback : value.toVariant();
+}
+
+void ConfigManager::setValue(const QString &key, const QVariant &value)
+{
+    sendSetConfig(key, QJsonValue::fromVariant(value));
+}
+
 void ConfigManager::sendSetConfig(const QString &key, const QJsonValue &value)
 {
     if (!m_client->isConnected()) {
         emit errorOccurred(tr("守护进程未连接"));
+        emit writeFinished(key, false, tr("守护进程未连接"));
         return;
     }
-
+    if (m_pendingKeys.contains(key)) return;
+    m_pendingKeys.insert(key); emit pendingKeysChanged();
     const QPointer<ConfigManager> guard(this);
-    m_client->setConfig(key, value, [guard, key](const Daemon::Response &resp) {
-        if (!guard)
-            return;
-        if (resp.type == Daemon::ResponseType::Error) {
-            auto err = resp.asError();
-            qWarning() << "[ConfigManager] SetConfig failed:" << key << err.message;
-            emit guard->errorOccurred(err.message);
-            if (guard && guard->m_client->isConnected())
-                guard->reload();
-        }
+    m_client->setConfig(key, value, [guard, key](const Daemon::Response &response) {
+        if (!guard) return;
+        guard->m_pendingKeys.remove(key); emit guard->pendingKeysChanged();
+        const bool success = response.type == Daemon::ResponseType::Ok;
+        const QString error = success ? QString() : response.asError().message;
+        if (!success) emit guard->errorOccurred(error);
+        if (!guard) return;
+        emit guard->writeFinished(key, success, error);
+        if (guard && guard->m_client->isConnected()) guard->reload();
     });
 }
 

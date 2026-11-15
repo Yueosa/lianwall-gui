@@ -11,6 +11,8 @@
 /// daemon 未连接时所有 daemon 配置写操作静默失败。
 
 #include <QObject>
+#include <QSet>
+#include <QVariantMap>
 #include <QString>
 #include <QJsonValue>
 #include <QJsonObject>
@@ -21,6 +23,9 @@ class DaemonClient;
 class ConfigManager : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QVariantMap document READ document NOTIFY documentChanged)
+    Q_PROPERTY(QStringList pendingKeys READ pendingKeys NOTIFY pendingKeysChanged)
+
 
     // ========================================================================
     // Daemon 配置属性（来自 GetConfig）
@@ -65,6 +70,10 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
 
 public:
+    QVariantMap document() const { return m_document.toVariantMap(); }
+    QStringList pendingKeys() const { return m_pendingKeys.values(); }
+    Q_INVOKABLE QVariant value(const QString &key, const QVariant &fallback = {}) const;
+    Q_INVOKABLE void setValue(const QString &key, const QVariant &value);
     explicit ConfigManager(DaemonClient *client, QObject *parent = nullptr);
 
     // --- Daemon 配置 Getters ---
@@ -135,6 +144,9 @@ public:
     Q_INVOKABLE QString cacheDirPath() const;
 
 signals:
+    void documentChanged();
+    void pendingKeysChanged();
+    void writeFinished(const QString &key, bool success, const QString &message);
     // Daemon 配置
     void modeChanged();
     void videoDirChanged();
@@ -177,6 +189,8 @@ private:
     /// 发送 SetConfig 请求
     void sendSetConfig(const QString &key, const QJsonValue &value);
 
+    QJsonObject m_document;
+    QSet<QString> m_pendingKeys;
     DaemonClient *m_client;
     bool m_configLoaded = false;
     bool m_reloadInFlight = false;

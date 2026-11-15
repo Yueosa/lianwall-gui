@@ -2,548 +2,139 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ".." as App
-import "../components" as Components
+import "../components" as C
 import "../dialogs" as Dialogs
-
-/// Library 壁纸库
-/// GridView 显示当前模式所有壁纸 + 搜索/过滤 + 详情弹窗
 Item {
-    id: libRoot
-
-    // 页面激活时懒加载
+    id: root
     property bool activated: false
-    onActivatedChanged: {
-        if (activated && DaemonState.daemonConnected) {
-            WallpaperModel.load()
+    property string media: "All"
+    property bool listMode: false
+    onActivatedChanged: if (activated) refresh.restart()
+    function reload() { if (activated && DaemonState.daemonConnected) { WallpaperModel.load(media); WallpaperModel.refreshMetadata() } }
+    Timer { id: refresh; interval: 120; onTriggered: root.reload() }
+    Connections {
+        target: WallpaperModel
+        function onMetadataChanged() {
+            if (WallpaperModel.metadataUnsupported) {
+                WallpaperFilterModel.favoritesOnly = false
+                if (["name", "modified"].indexOf(WallpaperFilterModel.sortKey) < 0) WallpaperFilterModel.sortKey = "name"
+            }
         }
     }
-
-    // daemon 连接后也触发加载
     Connections {
         target: DaemonState
-        function onDaemonConnectedChanged() {
-            if (DaemonState.daemonConnected && libRoot.activated) {
-                WallpaperModel.load()
-            }
-        }
+        function onDaemonConnectedChanged() { if (DaemonState.daemonConnected && root.activated) refresh.restart() }
+        function onSpaceUpdated() { if (root.activated) refresh.restart() }
+        function onWallpaperChanged() { if (root.activated) WallpaperModel.refreshMetadata() }
+        function onModeChanged() { if (root.activated) WallpaperModel.refreshMetadata() }
     }
-
-    // daemon SpaceUpdated / 壁纸切换后自动刷新
-    Connections {
-        target: DaemonState
-        function onSpaceUpdated(mode) {
-            if (libRoot.activated && DaemonState.daemonConnected)
-                refreshTimer.restart()
-        }
-        function onModeChanged() {
-            if (libRoot.activated && DaemonState.daemonConnected)
-                refreshTimer.restart()
-        }
-        function onTotalWallpapersChanged() {
-            if (libRoot.activated && DaemonState.daemonConnected) {
-                refreshTimer.restart()
-            }
-        }
-        function onWallpaperChanged(path, filename, trigger) {
-            if (libRoot.activated && DaemonState.daemonConnected) {
-                refreshTimer.restart()
-            }
-        }
-    }
-
-    // 防抖定时器（避免频繁刷新）
-    Timer {
-        id: refreshTimer
-        interval: 500
-        repeat: false
-        onTriggered: WallpaperModel.load()
-    }
-
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: App.Theme.spacingMedium
-        spacing: App.Theme.spacingMedium
-
-        // ================================================================
-        // 顶部工具栏：搜索 + 过滤 + 刷新
-        // ================================================================
+        anchors.fill: parent; spacing: 10
         RowLayout {
             Layout.fillWidth: true
-            spacing: App.Theme.spacingSmall
-
-            // 搜索框
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                radius: App.Theme.radiusMedium
-                color: App.Theme.surface
-                border.width: 1
-                border.color: searchInput.activeFocus ? App.Theme.accent : App.Theme.border
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: App.Theme.spacingSmall
-                    anchors.rightMargin: App.Theme.spacingSmall
-                    spacing: App.Theme.spacingSmall
-
-                    Text {
-                        text: "🔍"
-                        font.pixelSize: App.Theme.fontSizeMedium
-                        color: App.Theme.textSecondary
-                    }
-
-                    TextInput {
-                        id: searchInput
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: App.Theme.fontSizeMedium
-                        color: App.Theme.text
-                        clip: true
-                        onTextChanged: WallpaperFilterModel.searchText = text
-
-                        Text {
-                            anchors.fill: parent
-                            verticalAlignment: Text.AlignVCenter
-                            text: qsTr("搜索壁纸...")
-                            font.pixelSize: App.Theme.fontSizeMedium
-                            color: App.Theme.textSecondary
-                            visible: !searchInput.text && !searchInput.activeFocus
-                        }
-                    }
-
-                    // 清除按钮
-                    Text {
-                        text: "✕"
-                        font.pixelSize: App.Theme.fontSizeSmall
-                        color: App.Theme.textSecondary
-                        visible: searchInput.text.length > 0
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: searchInput.text = ""
-                        }
-                    }
-                }
-            }
-
-            // 锁定状态过滤
-            Row {
-                spacing: 2
-
-                FilterChip {
-                    text: qsTr("全部")
-                    selected: WallpaperFilterModel.lockFilter === -1
-                    onClicked: WallpaperFilterModel.lockFilter = -1
-                }
-                FilterChip {
-                    text: qsTr("🔓 未锁定")
-                    selected: WallpaperFilterModel.lockFilter === 0
-                    onClicked: WallpaperFilterModel.lockFilter = 0
-                }
-                FilterChip {
-                    text: qsTr("🔒 已锁定")
-                    selected: WallpaperFilterModel.lockFilter === 1
-                    onClicked: WallpaperFilterModel.lockFilter = 1
-                }
-            }
-
-            // 刷新按钮
-            Rectangle {
-                implicitWidth: refreshRow.implicitWidth + 16
-                height: 36
-                radius: App.Theme.radiusMedium
-                color: refreshMouse.pressed ? App.Theme.cardHover
-                       : refreshMouse.containsMouse ? App.Theme.surface : "transparent"
-                border.width: 1
-                border.color: App.Theme.border
-
-                Row {
-                    id: refreshRow
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        id: refreshIcon
-                        text: "🔄"
-                        font.pixelSize: 16
-
-                        RotationAnimation on rotation {
-                            running: WallpaperModel.loading
-                            from: 0; to: 360
-                            duration: 1000
-                            loops: Animation.Infinite
-                        }
-                    }
-
-                    Text {
-                        text: qsTr("刷新")
-                        font.pixelSize: App.Theme.fontSizeSmall
-                        color: App.Theme.text
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    id: refreshMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        LianwallApp.daemonReloadConfig()
-                        WallpaperModel.load()
-                    }
-                }
-            }
-        }
-
-        // 统计信息
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: App.Theme.spacingSmall
-
-            Text {
-                text: qsTr("模式: %1").arg(WallpaperModel.mode || DaemonState.mode)
-                font.pixelSize: App.Theme.fontSizeSmall
-                color: App.Theme.textSecondary
-            }
-            Text {
-                text: "•"
-                font.pixelSize: App.Theme.fontSizeSmall
-                color: App.Theme.textSecondary
-            }
-            Text {
-                text: qsTr("显示 %1 / %2").arg(WallpaperFilterModel.count).arg(WallpaperModel.count)
-                font.pixelSize: App.Theme.fontSizeSmall
-                color: App.Theme.textSecondary
-            }
+            Text { textFormat: Text.PlainText; text: qsTr("壁纸库"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.DemiBold }
+            Text { textFormat: Text.PlainText; text: qsTr("管理、筛选与查找壁纸"); color: App.Theme.textSecondary; font.pixelSize: 11 }
             Item { Layout.fillWidth: true }
-            BusyIndicator {
-                visible: LianwallApp.wallpaperSwitching
-                running: visible
-                Layout.preferredWidth: 24
-                Layout.preferredHeight: 24
-            }
-            Text {
-                visible: LianwallApp.wallpaperSwitching
-                text: qsTr("切换中…")
-                font.pixelSize: App.Theme.fontSizeSmall
-                color: App.Theme.textSecondary
-            }
+            C.UiButton { text: qsTr("打开壁纸目录"); iconName: "folder"; onClicked: ConfigManager.openCurrentWallpaperDir() }
+            C.UiButton { iconName: "refresh"; hint: qsTr("重新扫描壁纸"); enabled: DaemonState.daemonConnected && !WallpaperModel.loading; onClicked: LianwallApp.daemonRescan() }
         }
-
-        // ================================================================
-        // 壁纸网格
-        // ================================================================
-        Item {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            // 加载状态
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: App.Theme.spacingSmall
-                visible: WallpaperModel.loading && WallpaperModel.count === 0
-
-                BusyIndicator {
-                    Layout.alignment: Qt.AlignHCenter
-                    running: WallpaperModel.loading
-                }
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("加载中...")
-                    font.pixelSize: App.Theme.fontSizeMedium
-                    color: App.Theme.textSecondary
-                }
+        RowLayout {
+            Layout.fillWidth: true; spacing: 9
+            TextField {
+                Layout.fillWidth: true; implicitHeight: 35
+                placeholderText: qsTr("搜索名称、文件或目录…")
+                placeholderTextColor: App.Theme.textSecondary
+                color: App.Theme.text; font.pixelSize: 12; selectByMouse: true
+                leftPadding: 12
+                background: Rectangle { color: App.Theme.surface; radius: 8; border.color: parent.activeFocus ? App.Theme.accent : App.Theme.border }
+                onTextChanged: WallpaperFilterModel.searchText = text
             }
-
-            // 空状态
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: App.Theme.spacingSmall
-                visible: !WallpaperModel.loading && WallpaperModel.count === 0 && DaemonState.daemonConnected
-
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "📭"
-                    font.pixelSize: 48
-                }
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("暂无壁纸")
-                    font.pixelSize: App.Theme.fontSizeMedium
-                    color: App.Theme.textSecondary
-                }
+            C.UiComboBox {
+                property var keys: ["name", "modified", "added", "recent", "count", "duration"]
+                model: WallpaperModel.metadataAvailable ? [qsTr("名称 A–Z"), qsTr("最近修改"), qsTr("最近添加"), qsTr("最近使用"), qsTr("切换次数"), qsTr("驻留时长")] : [qsTr("名称 A–Z"), qsTr("最近修改")]
+                currentIndex: Math.max(0, keys.indexOf(WallpaperFilterModel.sortKey))
+                onActivated: WallpaperFilterModel.sortKey = keys[index]
+                font.pixelSize: 12; implicitHeight: 35
             }
-
-            // 未连接
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: App.Theme.spacingSmall
-                visible: !DaemonState.daemonConnected
-
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "🔌"
-                    font.pixelSize: 48
-                }
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("等待守护进程连接...")
-                    font.pixelSize: App.Theme.fontSizeMedium
-                    color: App.Theme.textSecondary
-                }
+            C.UiButton { iconName: "library"; kind: "flat"; selected: !root.listMode; hint: qsTr("网格视图"); onClicked: root.listMode = false }
+            C.UiButton { iconName: "list"; kind: "flat"; selected: root.listMode; hint: qsTr("列表视图"); onClicked: root.listMode = true }
+        }
+        RowLayout {
+            Layout.fillWidth: true; spacing: 5
+            Repeater {
+                model: [{name:qsTr("全部"),value:"All"},{name:qsTr("视频"),value:"Video"},{name:qsTr("图片"),value:"Image"}]
+                C.UiButton { required property var modelData; text: modelData.name; selected: root.media === modelData.value; kind: "flat"; onClicked: { root.media = modelData.value; root.reload() } }
             }
-
-            // 过滤无结果
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: App.Theme.spacingSmall
-                visible: !WallpaperModel.loading && WallpaperModel.count > 0 && WallpaperFilterModel.count === 0
-
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "🔍"
-                    font.pixelSize: 48
-                }
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("未找到匹配的壁纸")
-                    font.pixelSize: App.Theme.fontSizeMedium
-                    color: App.Theme.textSecondary
-                }
-            }
-
-            GridView {
-                id: wallpaperGrid
-                anchors.fill: parent
-                visible: WallpaperFilterModel.count > 0
-                clip: true
-                // 加大缓冲：配合 ThumbnailProvider 内存 LRU，滑出视口不立刻丢掉纹理
-                cacheBuffer: cellHeight * 12
-                reuseItems: true
-
-                cellWidth: {
-                    // 自适应列数：最少 2 列，每列最小 160px
-                    var cols = Math.max(2, Math.floor(width / 200))
-                    return Math.floor(width / cols)
-                }
-                cellHeight: cellWidth * 9 / 16 + 32   // 16:9 缩略图 + 文件名高度
-
-                model: WallpaperFilterModel
-
-                ScrollBar.vertical: Components.StyledScrollBar {}
-
-                delegate: Item {
-                    width: wallpaperGrid.cellWidth
-                    height: wallpaperGrid.cellHeight
-
-                    // GridView reuseItems 时属性可能在绑定前短暂为空，用 required 避免无效请求
-                    required property string wallpaperPath
-                    required property string wallpaperFilename
-                    required property bool wallpaperLocked
-                    required property bool wallpaperInCooldown
-                    required property bool wallpaperIsCurrent
-                    required property bool wallpaperIsVideo
-                    required property int index
-
+            C.UiButton { text: qsTr("收藏"); iconName: "heart"; visible: WallpaperModel.metadataAvailable; selected: WallpaperFilterModel.favoritesOnly; kind: "flat"; onClicked: WallpaperFilterModel.favoritesOnly = !WallpaperFilterModel.favoritesOnly }
+            C.UiButton { text: qsTr("已排除轮换"); iconName: "lock"; selected: WallpaperFilterModel.lockFilter === 1; kind: "flat"; onClicked: WallpaperFilterModel.lockFilter = WallpaperFilterModel.lockFilter === 1 ? -1 : 1 }
+            Item { Layout.fillWidth: true }
+            BusyIndicator { running: WallpaperModel.loading; visible: running; implicitWidth: 24; implicitHeight: 24 }
+            Text { textFormat: Text.PlainText; text: qsTr("%1 / %2 张").arg(WallpaperFilterModel.count).arg(WallpaperModel.count); color: App.Theme.textSecondary; font.pixelSize: 11 }
+        }
+        Text { Layout.fillWidth: true; visible: WallpaperModel.metadataError.length > 0; text: qsTr("收藏与统计：%1").arg(WallpaperModel.metadataError); textFormat: Text.PlainText; color: App.Theme.warning; font.pixelSize: 11; wrapMode: Text.Wrap }
+        GridView {
+            id: grid
+            Layout.fillWidth: true; Layout.fillHeight: true
+            model: WallpaperFilterModel
+            clip: true
+            cellWidth: root.listMode ? width : width / Math.max(2, Math.floor(width / 235))
+            cellHeight: root.listMode ? 87 : (cellWidth - 12) * 9 / 16 + 70
+            ScrollBar.vertical: ScrollBar {}
+            delegate: Item {
+                id: entry
+                required property int index
+                required property string wallpaperPath
+                required property string wallpaperFilename
+                required property bool wallpaperLocked
+                required property bool wallpaperIsCurrent
+                required property bool wallpaperFavorite
+                required property real wallpaperPlayCount
+                required property real wallpaperDisplaySeconds
+                required property bool wallpaperIsVideo
+                width: grid.cellWidth; height: grid.cellHeight
+                Rectangle {
+                    anchors.fill: parent; anchors.rightMargin: 10; anchors.bottomMargin: 10
+                    color: App.Theme.surface; radius: 10; clip: true
+                    border.color: entry.wallpaperIsCurrent ? App.Theme.accent : App.Theme.border
+                    border.width: entry.wallpaperIsCurrent ? 2 : 1
+                    Image {
+                        id: art
+                        x: 1; y: 1
+                        width: root.listMode ? 122 : parent.width - 2
+                        height: root.listMode ? parent.height - 2 : width * 9 / 16
+                        source: "image://thumbnail/" + encodeURIComponent(entry.wallpaperPath) + "?t=" + WallpaperModel.refreshToken
+                        sourceSize: Qt.size(640, 360); asynchronous: true; cache: false
+                        fillMode: Image.PreserveAspectCrop
+                    }
                     Rectangle {
-                        id: thumbCard
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        radius: App.Theme.radiusMedium
-                        color: thumbMouse.containsMouse ? App.Theme.cardHover : App.Theme.card
-                        border.width: wallpaperIsCurrent ? 2 : 1
-                        border.color: wallpaperIsCurrent ? App.Theme.accent : App.Theme.border
-
-                        Behavior on color {
-                            ColorAnimation { duration: 150 }
-                        }
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 0
-
-                            // 缩略图区域
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                radius: thumbCard.radius
-                                color: App.Theme.surface
-                                clip: true
-
-                                Image {
-                                    id: thumbImage
-                                    anchors.fill: parent
-                                    // 固定 Tiny 档 (320x180)，由 ThumbnailProvider 归档/LRU
-                                    sourceSize.width: 320
-                                    sourceSize.height: 180
-                                    source: wallpaperPath
-                                            ? ("image://thumbnail/"
-                                               + encodeURIComponent(wallpaperPath)
-                                               + "?t=" + WallpaperModel.refreshToken)
-                                            : ""
-                                    fillMode: Image.PreserveAspectCrop
-                                    asynchronous: true
-                                    // Qt Image 缓存交给我们自己的 LRU；避免双缓存撑爆内存
-                                    cache: false
-
-                                    // 加载占位
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        color: App.Theme.surface
-                                        visible: thumbImage.status !== Image.Ready
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: wallpaperIsVideo ? "🎬" : "🖼️"
-                                            font.pixelSize: 24
-                                        }
-
-                                        BusyIndicator {
-                                            anchors.bottom: parent.bottom
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            anchors.bottomMargin: 4
-                                            width: 16; height: 16
-                                            running: thumbImage.status === Image.Loading
-                                            visible: running
-                                        }
-                                    }
-                                }
-
-                                // 状态标记（左上角）
-                                Row {
-                                    anchors.top: parent.top
-                                    anchors.left: parent.left
-                                    anchors.margins: 4
-                                    spacing: 2
-
-                                    // 当前播放标记
-                                    Rectangle {
-                                        width: 20; height: 20
-                                        radius: 10
-                                        color: Qt.rgba(App.Theme.accent.r, App.Theme.accent.g, App.Theme.accent.b, 0.9)
-                                        visible: wallpaperIsCurrent
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶"
-                                            font.pixelSize: 10
-                                            color: App.Theme.textOnAccent
-                                        }
-                                    }
-
-                                    // 锁定标记
-                                    Rectangle {
-                                        width: 20; height: 20
-                                        radius: 10
-                                        color: Qt.rgba(0, 0, 0, 0.6)
-                                        visible: wallpaperLocked
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "🔒"
-                                            font.pixelSize: 10
-                                        }
-                                    }
-
-                                    // 冷却标记
-                                    Rectangle {
-                                        width: 20; height: 20
-                                        radius: 10
-                                        color: Qt.rgba(0, 0, 0, 0.6)
-                                        visible: wallpaperInCooldown
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "❄️"
-                                            font.pixelSize: 10
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 文件名
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 28
-                                color: "transparent"
-
-                                Text {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: App.Theme.spacingSmall
-                                    anchors.rightMargin: App.Theme.spacingSmall
-                                    text: wallpaperFilename
-                                    font.pixelSize: App.Theme.fontSizeSmall
-                                    color: App.Theme.text
-                                    elide: Text.ElideMiddle
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: thumbMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                detailDialog.wallpaperRow = index
-                                detailDialog.wallpaperPath = wallpaperPath
-                                detailDialog.wallpaperFilename = wallpaperFilename
-                                detailDialog.wallpaperLocked = wallpaperLocked
-                                detailDialog.wallpaperIsCurrent = wallpaperIsCurrent
-                                detailDialog.wallpaperIsVideo = wallpaperIsVideo
-                                detailDialog.open()
-                            }
+                        x: 8; y: 8; radius: 5; height: 21; width: tag.implicitWidth + 12
+                        color: "#a0303040"
+                        Text { textFormat: Text.PlainText; id: tag; anchors.centerIn: parent; text: entry.wallpaperIsCurrent ? qsTr("正在使用") : entry.wallpaperIsVideo ? qsTr("视频") : qsTr("图片"); color: "white"; font.pixelSize: 10 }
+                    }
+                    ColumnLayout {
+                        x: root.listMode ? 138 : 11
+                        y: root.listMode ? 10 : art.height + 8
+                        width: parent.width - x - 10
+                        spacing: 4
+                        Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: entry.wallpaperFilename; color: App.Theme.text; font.pixelSize: 12; elide: Text.ElideMiddle }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: entry.wallpaperLocked ? qsTr("已排除自动轮换") : entry.wallpaperIsVideo ? qsTr("视频壁纸") : qsTr("静态壁纸"); color: App.Theme.textSecondary; font.pixelSize: 10 }
+                            C.UiButton { iconName: "heart"; visible: WallpaperModel.metadataAvailable; selected: entry.wallpaperFavorite; kind: "flat"; implicitHeight: 27; hint: entry.wallpaperFavorite ? qsTr("取消收藏") : qsTr("收藏壁纸"); enabled: DaemonState.daemonConnected && WallpaperModel.pendingFavorites.indexOf(entry.wallpaperPath) < 0; onClicked: WallpaperModel.setFavorite(entry.wallpaperPath, !entry.wallpaperFavorite) }
+                            C.UiButton { iconName: "lock"; selected: entry.wallpaperLocked; kind: "flat"; implicitHeight: 27; hint: qsTr("排除 / 加入自动轮换"); enabled: DaemonState.daemonConnected; onClicked: WallpaperFilterModel.toggleLockByPath(entry.wallpaperPath) }
+                            C.UiButton { iconName: "play"; kind: "flat"; implicitHeight: 27; hint: qsTr("设为壁纸"); enabled: DaemonState.daemonConnected && !LianwallApp.wallpaperSwitching; onClicked: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
                         }
                     }
+                    TapHandler { acceptedButtons: Qt.LeftButton; onDoubleTapped: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
+                    HoverHandler { id: hover }
+                    C.UiToolTip {
+                    visible: hover.hovered
+                    text: entry.wallpaperPath + "\n" + qsTr("双击设为壁纸") + (WallpaperModel.metadataAvailable ? "\n" + qsTr("成功切换 %1 次 · 驻留 %2 分钟").arg(entry.wallpaperPlayCount).arg(Math.floor(entry.wallpaperDisplaySeconds / 60)) : "")
+                    delay: 900
+                    }
                 }
-
             }
-        }
-    }
-
-    // ================================================================
-    // 详情弹窗
-    // ================================================================
-    Dialogs.WallpaperDetailDialog {
-        id: detailDialog
-        parent: Overlay.overlay
-    }
-
-    // ================================================================
-    // 内联组件
-    // ================================================================
-
-    /// 过滤标签
-    component FilterChip: Rectangle {
-        property string text: ""
-        property bool selected: false
-        signal clicked()
-
-        width: chipLabel.width + App.Theme.spacingSmall * 2
-        height: 32
-        radius: App.Theme.radiusMedium
-        color: selected ? App.Theme.accent : (chipMouse.containsMouse ? App.Theme.cardHover : "transparent")
-        border.width: selected ? 0 : 1
-        border.color: App.Theme.border
-
-        Behavior on color {
-            ColorAnimation { duration: 150 }
-        }
-
-        Text {
-            id: chipLabel
-            anchors.centerIn: parent
-            text: parent.text
-            font.pixelSize: App.Theme.fontSizeSmall
-            color: parent.selected ? App.Theme.textOnAccent : App.Theme.text
-        }
-
-        MouseArea {
-            id: chipMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: parent.clicked()
+            Text { textFormat: Text.PlainText; anchors.centerIn: parent; visible: grid.count === 0 && !WallpaperModel.loading; text: DaemonState.daemonConnected ? qsTr("没有匹配的壁纸，试试其他搜索或筛选条件。") : qsTr("连接壁纸服务后查看媒体库。"); color: App.Theme.textSecondary; font.pixelSize: 12 }
         }
     }
 }

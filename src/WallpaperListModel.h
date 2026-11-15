@@ -27,6 +27,10 @@ class WallpaperListModel : public QAbstractListModel
     Q_OBJECT
 
     /// 当前查询的模式
+    Q_PROPERTY(bool metadataUnsupported READ metadataUnsupported NOTIFY metadataChanged)
+    Q_PROPERTY(bool metadataAvailable READ metadataAvailable NOTIFY metadataChanged)
+    Q_PROPERTY(QString metadataError READ metadataError NOTIFY metadataChanged)
+    Q_PROPERTY(QStringList pendingFavorites READ pendingFavorites NOTIFY metadataChanged)
     Q_PROPERTY(QString mode READ mode NOTIFY modeChanged)
 
     /// 数据是否正在加载
@@ -47,6 +51,8 @@ public:
         InCooldownRole,
         IsCurrentRole,
         IndexRole,
+        FavoriteRole, PlayCountRole, DisplaySecondsRole, AddedAtRole, LastUsedRole,
+        ModifiedRole,
         IsVideoRole,          // 根据文件扩展名判断
     };
 
@@ -58,6 +64,12 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     // --- 属性 ---
+    bool metadataUnsupported() const { return m_metadataUnsupported; }
+    bool metadataAvailable() const { return m_metadataAvailable; }
+    QString metadataError() const { return m_metadataError; }
+    QStringList pendingFavorites() const { return m_pendingFavorites.values(); }
+    Q_INVOKABLE void refreshMetadata();
+    Q_INVOKABLE void setFavorite(const QString &path, bool favorite);
     QString mode() const { return m_mode; }
     bool loading() const { return m_loading; }
     int count() const { return m_items.size(); }
@@ -96,6 +108,7 @@ public:
     Q_INVOKABLE void setAsCurrentByPath(const QString &path);
 
 signals:
+    void metadataChanged();
     void modeChanged();
     void loadingChanged();
     void countChanged();
@@ -105,6 +118,15 @@ signals:
     void errorOccurred(const QString &message);
 
 private:
+    void metadataPage(int offset, quint64 generation);
+    bool m_metadataUnsupported = false;
+    bool m_metadataAvailable = false, m_metadataLoading = false, m_metadataAgain = false;
+    quint64 m_metadataGeneration = 0, m_metadataEpoch = 0;
+    qint64 m_metadataRevision = -1;
+    int m_metadataRestarts = 0;
+    QString m_metadataError;
+    QHash<QString, QVariantMap> m_metadata, m_metadataBuffer;
+    QSet<QString> m_pendingFavorites;
     DaemonClient *m_client;
     WallpaperController *m_wallpaperController;
     QString m_requestedMode;
@@ -112,6 +134,8 @@ private:
     quint64 m_loadGeneration = 0;
     quint64 m_contentRevision = 0;
     QVector<Daemon::WallpaperPoint> m_items;
+    QHash<QString, qint64> m_modifiedTimes;
+    QString m_activePath;
     QString m_mode;
     bool m_loading = false;
     int m_refreshToken = 0;
@@ -127,6 +151,8 @@ class WallpaperFilterModel : public QSortFilterProxyModel
     Q_OBJECT
 
     /// 搜索关键词（按文件名过滤）
+    Q_PROPERTY(bool favoritesOnly READ favoritesOnly WRITE setFavoritesOnly NOTIFY favoritesOnlyChanged)
+    Q_PROPERTY(QString sortKey READ sortKey WRITE setSortKey NOTIFY sortKeyChanged)
     Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchTextChanged)
 
     /// 锁定状态过滤：-1=全部, 0=未锁定, 1=已锁定
@@ -138,6 +164,10 @@ class WallpaperFilterModel : public QSortFilterProxyModel
 public:
     explicit WallpaperFilterModel(QObject *parent = nullptr);
 
+    bool favoritesOnly() const { return m_favoritesOnly; }
+    void setFavoritesOnly(bool value);
+    QString sortKey() const { return m_sortKey; }
+    void setSortKey(const QString &key);
     QString searchText() const { return m_searchText; }
     void setSearchText(const QString &text);
 
@@ -159,14 +189,19 @@ public:
     Q_INVOKABLE void setAsCurrentByPath(const QString &path);
 
 signals:
+    void favoritesOnlyChanged();
+    void sortKeyChanged();
     void searchTextChanged();
     void lockFilterChanged();
     void countChanged();
 
 protected:
+    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
 
 private:
+    bool m_favoritesOnly = false;
+    QString m_sortKey = QStringLiteral("name");
     QString m_searchText;
     int m_lockFilter = -1;   // -1=全部
 };

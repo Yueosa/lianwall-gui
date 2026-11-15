@@ -1,4 +1,6 @@
 #include "DaemonClient.h"
+#include "Constants.h"
+#include "FrontendState.h"
 #include "ConfigManager.h"
 #include "DaemonState.h"
 #include "WallpaperController.h"
@@ -6,6 +8,7 @@
 
 #include <QJsonDocument>
 #include <QFile>
+#include <QDateTime>
 #include <QLocalServer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -81,6 +84,161 @@ private slots:
         server.close();
     }
 
+    void logRefreshCoalescesToMostRecentFilter()
+    {
+        FrontendState frontend(client.get());frontend.refreshLogs("warn");auto first=request();
+        frontend.refreshLogs("info");frontend.refreshLogs("error");
+        reply(first["id"].toInteger(),"Logs",{{"schema_version",1},{"entries",QJsonArray{}}});
+        const auto latest=request();QCOMPARE(latest["level"].toString(),QString("error"));
+        reply(latest["id"].toInteger(),"Logs",{{"schema_version",1},{"entries",QJsonArray{QJsonObject{{"line","latest error"}}}}});
+        QTRY_COMPARE(frontend.logs().size(),1);QTest::qWait(10);QVERIFY(!peer->canReadLine());
+        QVERIFY(!frontend.pending().contains("GetLogs"));
+    }
+
+    void diagnosticsUseDraftsAndPreserveLogsAfterRefreshFailure()
+    {
+        FrontendState frontend(client.get());
+        frontend.testVram("custom", "printf draft");frontend.testVram("custom", "duplicate");
+        auto pending=request();QCOMPARE(pending["cmd"].toString(),QString("TestVram"));QCOMPARE(pending["command"].toString(),QString("printf draft"));
+        QTest::qWait(10);QVERIFY(!peer->canReadLine());
+        reply(pending["id"].toInteger(),"VramTest",{{"schema_version",1},{"success",true},{"used_mb",100}});
+        QTRY_VERIFY(frontend.vramTest().value("success").toBool());
+        frontend.refreshLogs("warn");pending=request();QCOMPARE(pending["level"].toString(),QString("warn"));
+        reply(pending["id"].toInteger(),"Logs",{{"schema_version",1},{"entries",QJsonArray{QJsonObject{{"timestamp","2026-11-15T00:00:00Z"},{"line","WARN sample <text>"}}}},
+              {"path","/private/daemon.jsonl"},{"active_filter","lianwall_daemon=warn"},{"environment_override",true}});
+        QTRY_COMPARE(frontend.logs().size(),1);QVERIFY(frontend.logEnvironmentOverride());
+        const auto exported=directory.path()+"/export.log";QVERIFY(frontend.exportLogsTo(exported));
+        QFile file(exported);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),QByteArray("2026-11-15T00:00:00Z WARN sample <text>\n"));
+        QVERIFY(!file.permissions().testFlag(QFileDevice::ReadOther));
+        frontend.refreshLogs("error");pending=request();reply(pending["id"].toInteger(),"Error",{{"code","internal_error"},{"message","unavailable"}});
+        QTRY_COMPARE(frontend.logsError(),QString("unavailable"));QCOMPARE(frontend.logs().size(),1);
+        client->disconnectFromDaemon();QTRY_VERIFY(frontend.logs().isEmpty());QVERIFY(frontend.vramTest().isEmpty());QVERIFY(frontend.logPath().isEmpty());
+    }
+
+    void allMetadataSortKeysUseTheirActualValues()
+    {
+        QStringList paths;
+        for (int i=0;i<3;++i) {
+            const QString path=directory.path()+QString("/%1.png").arg(QChar('a'+i));paths.append(path);
+            QFile file(path);QVERIFY(file.open(QIODevice::WriteOnly));
+            QVERIFY(file.setFileTime(QDateTime::fromSecsSinceEpoch(i==0?1000:i==1?3000:2000),QFileDevice::FileModificationTime));
+        }
+        WallpaperListModel model(client.get(),nullptr);model.load("Image");auto pending=request();
+        QJsonArray items, metadata;
+        for (int i=0;i<3;++i) {
+            items.append(QJsonObject{{"path",paths[i]},{"filename",QFileInfo(paths[i]).fileName()},{"locked",i==1}});
+            metadata.append(QJsonObject{{"path",paths[i]},{"favorite",i==2},{"play_count",3-i},{"display_seconds",i==0?10:i==1?30:20},{"added_at",i==0?100:i==1?300:200},{"last_used",300-i*100}});
+        }
+        reply(pending["id"].toInteger(),"Space",{{"mode","Image"},{"items",items}});QTRY_COMPARE(model.count(),3);
+        model.refreshMetadata();pending=request();reply(pending["id"].toInteger(),"Library",{{"schema_version",1},{"revision",1},{"entries",metadata},{"next_offset",QJsonValue::Null}});QTRY_VERIFY(model.metadataAvailable());
+        WallpaperFilterModel filtered;filtered.setSourceModel(&model);
+        const QList<QPair<QString,int>> cases{{"name",0},{"modified",1},{"added",1},{"recent",0},{"count",0},{"duration",1}};
+        for (const auto &test:cases) {filtered.setSortKey(test.first);QCOMPARE(filtered.sortKey(),test.first);QCOMPARE(filtered.pathAt(0),paths[test.second]);}
+        filtered.setSortKey("unknown");QCOMPARE(filtered.sortKey(),QString("duration"));
+        filtered.setFavoritesOnly(true);QCOMPARE(filtered.count(),1);QCOMPARE(filtered.pathAt(0),paths[2]);
+        filtered.setSearchText("no-such-name");QCOMPARE(filtered.count(),0);
+        filtered.setSearchText("");QCOMPARE(filtered.count(),1);
+        filtered.setFavoritesOnly(false);filtered.setLockFilter(1);QCOMPARE(filtered.count(),1);QCOMPARE(filtered.pathAt(0),paths[1]);
+        filtered.setLockFilter(-1);QCOMPARE(filtered.count(),3);
+    }
+
+    void metadataTransportFailureIsNotAnUnsupportedService()
+    {
+        WallpaperListModel model(client.get(), nullptr);
+        model.refreshMetadata();auto pending=request();
+        reply(pending["id"].toInteger(),"Error",{{"code","connection_lost"},{"message","Disconnected"}});
+        QTRY_VERIFY(!model.metadataError().isEmpty());QVERIFY(!model.metadataUnsupported());
+        model.refreshMetadata();pending=request();
+        reply(pending["id"].toInteger(),"Error",{{"code","invalid_request"},{"message","Unknown GetLibrary"}});
+        QTRY_VERIFY(model.metadataUnsupported());
+        model.refreshMetadata();pending=request();
+        reply(pending["id"].toInteger(),"Library",{{"schema_version",1},{"revision",1},{"entries",QJsonArray{}},{"next_offset",QJsonValue::Null}});
+        QTRY_VERIFY(model.metadataAvailable());QVERIFY(!model.metadataUnsupported());
+    }
+
+    void metadataPagingRejectsMixedRevisions()
+    {
+        WallpaperListModel model(client.get(), nullptr);
+        model.refreshMetadata();
+        auto pending = request();
+        QCOMPARE(pending["cmd"].toString(), QString("GetLibrary"));
+        reply(pending["id"].toInteger(), "Library", {{"schema_version",1}, {"revision",1}, {"next_offset",1},
+            {"entries", QJsonArray{QJsonObject{{"path","/old.jpg"}, {"favorite",true}}}}});
+        pending = request(); QCOMPARE(pending["offset"].toInt(), 1);
+        reply(pending["id"].toInteger(), "Library", {{"schema_version",1}, {"revision",2}, {"next_offset",QJsonValue::Null}, {"entries",QJsonArray{}}});
+        pending = request(); QCOMPARE(pending["offset"].toInt(), 0);
+        QVERIFY(!model.metadataAvailable());
+        reply(pending["id"].toInteger(), "Library", {{"schema_version",1}, {"revision",2}, {"next_offset",QJsonValue::Null},
+            {"entries", QJsonArray{QJsonObject{{"path","/new.jpg"}, {"favorite",true}}}}});
+        QTRY_VERIFY(model.metadataAvailable());
+        model.setFavorite("/old.jpg", false);
+        QTest::qWait(10); QVERIFY(!peer->canReadLine());
+        model.setFavorite("/new.jpg", false);
+        pending = request(); QCOMPARE(pending["path"].toString(), QString("/new.jpg"));
+        reply(pending["id"].toInteger(), "Error", {{"code","internal_error"},{"message","disk full"}});
+        QTRY_VERIFY(model.pendingFavorites().isEmpty());
+    }
+
+    void favoriteUsesAcknowledgementAndCoalescesDuplicateClicks()
+    {
+        WallpaperListModel model(client.get(), nullptr);
+        model.load("Image");
+        auto pending = request(); reply(pending["id"].toInteger(), "Space", space("Image", "/wall.jpg"));
+        QTRY_COMPARE(model.count(), 1);
+        model.refreshMetadata(); pending = request();
+        reply(pending["id"].toInteger(), "Library", {{"schema_version",1}, {"revision",1}, {"next_offset",QJsonValue::Null},
+            {"entries",QJsonArray{QJsonObject{{"path","/wall.jpg"},{"favorite",false},{"play_count",4},{"display_seconds",120}}}}});
+        QTRY_VERIFY(model.metadataAvailable());
+        model.setFavorite("/wall.jpg",true); model.setFavorite("/wall.jpg",true);
+        pending = request(); QCOMPARE(pending["cmd"].toString(), QString("SetFavorite"));
+        QVERIFY(!model.index(0).data(WallpaperListModel::FavoriteRole).toBool());
+        QTest::qWait(10); QVERIFY(!peer->canReadLine());
+        reply(pending["id"].toInteger(),"Ok"); pending = request();
+        reply(pending["id"].toInteger(), "Library", {{"schema_version",1}, {"revision",2}, {"next_offset",QJsonValue::Null},
+            {"entries",QJsonArray{QJsonObject{{"path","/wall.jpg"},{"favorite",true},{"play_count",4},{"display_seconds",120}}}}});
+        QTRY_VERIFY(model.index(0).data(WallpaperListModel::FavoriteRole).toBool());
+        WallpaperFilterModel filtered; filtered.setSourceModel(&model); filtered.setFavoritesOnly(true);
+        QCOMPARE(filtered.count(),1);
+        QSignalSpy errors(&model, &WallpaperListModel::errorOccurred);
+        model.setFavorite("/wall.jpg",false);pending=request();reply(pending["id"].toInteger(),"Error",{{"code","internal_error"},{"message","disk full"}});
+        QTRY_COMPARE(errors.count(),1);
+        QVERIFY(model.index(0).data(WallpaperListModel::FavoriteRole).toBool());
+        QCOMPARE(filtered.count(),1);
+    }
+
+    void unsolicitedEngineSnapshotDoesNotConsumeTaggedQuery()
+    {
+        QSignalSpy snapshot(client.get(), &DaemonClient::initialEngineInfoReceived);
+        int callbacks = 0;
+        client->query("GetEngineInfo", {}, [&](const Daemon::Response &response) {
+            ++callbacks;
+            QCOMPARE(response.payload.value("schema_version").toInt(), 1);
+        });
+        const auto pending = request();
+        reply(0, "EngineInfo", {{"schema_version", 1}});
+        QTRY_COMPARE(snapshot.count(), 1);
+        QCOMPARE(callbacks, 0);
+        reply(pending["id"].toInteger(), "EngineInfo", {{"schema_version", 1}});
+        QTRY_COMPARE(callbacks, 1);
+    }
+
+    void hookArrayPayloadIsPreserved()
+    {
+        bool received = false;
+        client->query("ListHooks", {}, [&](const Daemon::Response &response) {
+            received = true;
+            QVERIFY(response.rawPayload.isArray());
+            QCOMPARE(response.rawPayload.toArray().size(), 1);
+        });
+        const auto pending = request();
+        peer->write(QJsonDocument(QJsonObject{
+            {"id", pending["id"]}, {"type", "HookList"},
+            {"payload", QJsonArray{QJsonObject{{"name", "test-hook"}}}},
+        }).toJson(QJsonDocument::Compact) + '\n');
+        peer->flush();
+        QTRY_VERIFY(received);
+    }
+
     void imageArgumentsUseNewKeyForSnapshotEventAndMutation()
     {
         ConfigManager config(client.get());
@@ -132,6 +290,17 @@ private slots:
         reply(mutation["id"].toInteger(), "Error", {{"code", "InvalidRequest"}, {"message", "rejected"}});
         QTest::qWait(20);
         QVERIFY(client->isConnected());
+    }
+
+    void explicitDaemonPathNeverFallsBackToSystemInstall()
+    {
+        const auto previous = qgetenv("LIANWALL_DAEMON_EXECUTABLE");
+        const auto path = directory.path() + "/unavailable-dev-daemon";
+        qputenv("LIANWALL_DAEMON_EXECUTABLE", path.toUtf8());
+        const auto resolved = LianwallGui::Paths::findLianwalld();
+        if (previous.isNull()) qunsetenv("LIANWALL_DAEMON_EXECUTABLE");
+        else qputenv("LIANWALL_DAEMON_EXECUTABLE", previous);
+        QCOMPARE(resolved, path);
     }
 
     void restartWaitsForOldSocketRemovalBeforeLaunching()

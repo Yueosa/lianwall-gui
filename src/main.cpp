@@ -5,6 +5,7 @@
 #include <QLocalServer>
 #include <csignal>
 #include <QCommandLineParser>
+#include <QTimer>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
@@ -18,7 +19,7 @@ static void signalHandler(int sig)
 {
     Q_UNUSED(sig)
     if (g_app)
-        QMetaObject::invokeMethod(g_app, "quit", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(g_app, "quitGui", Qt::QueuedConnection);
 }
 
 /// 尝试连接已有实例，成功则通知其显示窗口并返回 true
@@ -47,7 +48,20 @@ int main(int argc, char *argv[])
     const QCommandLineOption socketOption(QStringLiteral("socket"),
         QStringLiteral("Daemon Unix socket path"), QStringLiteral("path"), QStringLiteral("/tmp/lianwall.sock"));
     parser.addOption(socketOption);
+    const QCommandLineOption showOption(QStringLiteral("show"), QStringLiteral("Show the main window on startup"));
+    parser.addOption(showOption);
+    const QCommandLineOption daemonOption(QStringLiteral("daemon-executable"),
+        QStringLiteral("Use this daemon executable for automatic start and restart"), QStringLiteral("path"));
+    parser.addOption(daemonOption);
     parser.process(*QCoreApplication::instance());
+    if (parser.isSet(daemonOption)) {
+        const QFileInfo executable(parser.value(daemonOption));
+        if (!executable.isFile() || !executable.isExecutable()) {
+            qCritical() << "--daemon-executable requires an executable file";
+            return 2;
+        }
+        qputenv("LIANWALL_DAEMON_EXECUTABLE", executable.absoluteFilePath().toUtf8());
+    }
     QString socketPath = parser.value(socketOption);
     if (socketPath.isEmpty()) {
         qCritical() << "--socket requires a nonempty path";
@@ -92,5 +106,6 @@ int main(int argc, char *argv[])
     std::signal(SIGINT,  signalHandler);
     std::signal(SIGTERM, signalHandler);
 
+    if (parser.isSet(showOption)) QTimer::singleShot(0, &app, &Application::showMainWindow);
     return app.exec();
 }

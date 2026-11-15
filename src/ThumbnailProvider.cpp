@@ -184,8 +184,9 @@ ThumbnailResponse::ThumbnailResponse(const QString &path, const QSize &requested
     , m_memoryCache(std::move(memoryCache))
     , m_workState(std::move(workState))
 {
-    setAutoDelete(false);
-    pool->start(this);
+    // A separate runnable owns the pool job. Qt owns this response and may
+    // delete it as soon as finished is delivered.
+    pool->start([this]() { run(); });
 }
 
 QQuickTextureFactory *ThumbnailResponse::textureFactory() const
@@ -232,7 +233,12 @@ bool ThumbnailResponse::cancelled() const
 
 void ThumbnailResponse::run()
 {
-    const auto finish = qScopeGuard([this]() { emit finished(); });
+    const auto finish = qScopeGuard([this]() {
+        // Complete on the response's owning thread. In particular, cancellation
+        // and fast cache hits must not race reader-thread cleanup/registration
+        // with a worker emitting the final signal.
+        QMetaObject::invokeMethod(this, [this]() { emit finished(); }, Qt::QueuedConnection);
+    });
     if (cancelled())
         return;
     const QFileInfo source(m_path);

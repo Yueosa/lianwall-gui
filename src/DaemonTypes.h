@@ -85,6 +85,8 @@ enum class EventType {
     VramChanged,
     TimePointReached,
     ScanProgress,
+    EngineChanged,
+    LibraryChanged,
     Error,
     All,
 };
@@ -97,6 +99,8 @@ inline QString eventTypeToString(EventType e) {
         case EventType::SpaceUpdated:       return QStringLiteral("space_updated");
         case EventType::VramChanged:        return QStringLiteral("vram_changed");
         case EventType::TimePointReached:   return QStringLiteral("time_point_reached");
+        case EventType::LibraryChanged: return QStringLiteral("library_changed");
+        case EventType::EngineChanged: return QStringLiteral("engine_changed");
         case EventType::ScanProgress:       return QStringLiteral("scan_progress");
         case EventType::Error:              return QStringLiteral("error");
         case EventType::All:                return QStringLiteral("all");
@@ -105,6 +109,8 @@ inline QString eventTypeToString(EventType e) {
 }
 
 inline EventType eventTypeFromString(const QString &s) {
+    if (s == QLatin1String("library_changed") || s == QLatin1String("LibraryChanged")) return EventType::LibraryChanged;
+    if (s == QLatin1String("engine_changed") || s == QLatin1String("EngineChanged")) return EventType::EngineChanged;
     // 同时支持蛇形命名 (Subscribe 请求) 和驼峰命名 (Event 推送)
     if (s == QLatin1String("wallpaper_changed") || s == QLatin1String("WallpaperChanged"))   return EventType::WallpaperChanged;
     if (s == QLatin1String("status_changed")    || s == QLatin1String("StatusChanged"))      return EventType::StatusChanged;
@@ -739,6 +745,12 @@ enum class ResponseType {
     Subscribed,
     Unsubscribed,
     RotationStatus,
+    EngineInfo,
+    Outputs,
+    HookList,
+    Library,
+    VramTest,
+    Logs,
     Event,
     Unknown,
 };
@@ -755,12 +767,19 @@ inline ResponseType responseTypeFromString(const QString &s) {
     if (s == QLatin1String("Unsubscribed")) return ResponseType::Unsubscribed;
     if (s == QLatin1String("RotationStatus")) return ResponseType::RotationStatus;
     if (s == QLatin1String("Event"))        return ResponseType::Event;
+    if (s == QLatin1String("EngineInfo")) return ResponseType::EngineInfo;
+    if (s == QLatin1String("Outputs")) return ResponseType::Outputs;
+    if (s == QLatin1String("HookList")) return ResponseType::HookList;
+    if (s == QLatin1String("Library")) return ResponseType::Library;
+    if (s == QLatin1String("VramTest")) return ResponseType::VramTest;
+    if (s == QLatin1String("Logs")) return ResponseType::Logs;
     return ResponseType::Unknown;
 }
 
 /// 解析后的响应
 struct Response {
     ResponseType type = ResponseType::Unknown;
+    QJsonValue rawPayload;
     QJsonObject payload;           // 原始 payload（按需解析具体结构）
 
     /// 从一行 JSON 解析
@@ -773,7 +792,8 @@ struct Response {
         auto obj = doc.object();
         Response r;
         r.type    = responseTypeFromString(obj[QLatin1String("type")].toString());
-        r.payload = obj[QLatin1String("payload")].toObject();
+        r.rawPayload = obj[QLatin1String("payload")];
+        r.payload = r.rawPayload.toObject();
         return r;
     }
 

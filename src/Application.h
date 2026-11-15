@@ -17,6 +17,7 @@
 
 #include "DaemonTypes.h"
 
+class FrontendState;
 class DaemonClient;
 class DaemonState;
 class ConfigManager;
@@ -53,6 +54,7 @@ public slots:
     void toggleMainWindow();
     /// 真正退出应用（非隐藏）
     void quit();
+    Q_INVOKABLE void quitGui();
     /// 切换语言
     void switchLanguage(const QString &lang);
 
@@ -89,8 +91,10 @@ private:
     QApplication *m_app;
     QQmlApplicationEngine *m_engine;
     QTranslator *m_translator;
+    QList<QTranslator *> m_frameworkTranslators;
 
     // 核心组件
+    FrontendState *m_frontend = nullptr;
     DaemonClient *m_daemonClient;
     DaemonState  *m_daemonState;
     ConfigManager *m_configManager;

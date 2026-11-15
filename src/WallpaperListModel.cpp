@@ -4,6 +4,8 @@
 #include <QPointer>
 
 #include <QFileInfo>
+#include <QDateTime>
+#include <memory>
 #include <QDebug>
 
 // ============================================================================
@@ -26,6 +28,13 @@ WallpaperListModel::WallpaperListModel(DaemonClient *client, WallpaperController
     connect(client, &DaemonClient::connectionChanged, this, [this](bool connected) {
         if (connected)
             return;
+        m_metadataUnsupported = false;
+        ++m_metadataEpoch;
+        ++m_metadataGeneration;
+        m_metadataLoading = false; m_metadataAgain = false; m_metadataAvailable = false;
+        m_metadata.clear(); m_metadataBuffer.clear(); m_pendingFavorites.clear(); m_metadataError.clear();
+        emit metadataChanged();
+        if (!m_items.isEmpty()) emit dataChanged(index(0), index(m_items.size() - 1));
         ++m_loadGeneration;
         ++m_contentRevision;
         m_reloadPending = false;
@@ -35,7 +44,17 @@ WallpaperListModel::WallpaperListModel(DaemonClient *client, WallpaperController
             emit loadingChanged();
         }
     });
+    const auto updateCurrent = [this](const QString &path) {
+        if (m_activePath == path) return;
+        m_activePath = path;
+        if (!m_items.isEmpty()) emit dataChanged(index(0), index(m_items.size() - 1), {IsCurrentRole});
+    };
+    connect(client, &DaemonClient::initialStatusReceived, this, [updateCurrent](const Daemon::StatusPayload &status) { updateCurrent(status.current); });
+    connect(client, &DaemonClient::eventReceived, this, [updateCurrent](const Daemon::DaemonEvent &event) {
+        if (event.type == Daemon::EventType::WallpaperChanged) updateCurrent(event.asWallpaperChanged().path);
+    });
     connect(client, &DaemonClient::eventReceived, this, [this](const Daemon::DaemonEvent &event) {
+        if (event.type == Daemon::EventType::LibraryChanged && m_metadataAvailable) refreshMetadata();
         if (event.type == Daemon::EventType::SpaceUpdated
             || event.type == Daemon::EventType::WallpaperChanged
             || event.type == Daemon::EventType::StatusChanged)
@@ -61,8 +80,14 @@ QVariant WallpaperListModel::data(const QModelIndex &index, int role) const
     case AngleRole:       return item.angle;
     case LockedRole:      return item.locked;
     case InCooldownRole:  return item.inCooldown;
-    case IsCurrentRole:   return item.isCurrent;
+    case IsCurrentRole:   return m_activePath.isEmpty() ? (m_mode == QLatin1String("All") ? false : item.isCurrent) : item.path == m_activePath;
     case IndexRole:       return item.index;
+    case FavoriteRole: return m_metadata.value(item.path).value("favorite", false);
+    case PlayCountRole: return m_metadata.value(item.path).value("play_count", 0);
+    case DisplaySecondsRole: return m_metadata.value(item.path).value("display_seconds", 0);
+    case AddedAtRole: return m_metadata.value(item.path).value("added_at", 0);
+    case LastUsedRole: return m_metadata.value(item.path).value("last_used", 0);
+    case ModifiedRole:   return m_modifiedTimes.value(item.path);
     case IsVideoRole:     return isVideoFile(item.filename);
     }
     return {};
@@ -78,6 +103,9 @@ QHash<int, QByteArray> WallpaperListModel::roleNames() const
         { InCooldownRole, "wallpaperInCooldown" },
         { IsCurrentRole,  "wallpaperIsCurrent" },
         { IndexRole,      "wallpaperIndex" },
+        { FavoriteRole, "wallpaperFavorite" }, { PlayCountRole, "wallpaperPlayCount" },
+        { DisplaySecondsRole, "wallpaperDisplaySeconds" }, { AddedAtRole, "wallpaperAddedAt" }, { LastUsedRole, "wallpaperLastUsed" },
+        { ModifiedRole, "wallpaperModified" },
         { IsVideoRole,    "wallpaperIsVideo" },
     };
 }
@@ -96,34 +124,121 @@ void WallpaperListModel::load(const QString &mode)
     const quint64 generation = ++m_loadGeneration;
     const quint64 revision = m_contentRevision;
     emit loadingChanged();
-    std::optional<Daemon::WallMode> queryMode;
-    if (!mode.isEmpty())
-        queryMode = Daemon::wallModeFromString(mode);
+    struct Result { int remaining; QVector<Daemon::WallpaperPoint> items; QString error; QString mode; };
+    const bool all = mode == QLatin1String("All");
+    const auto result = std::make_shared<Result>();
+    result->remaining = all ? 2 : 1;
+    result->mode = all ? QStringLiteral("All") : mode;
     const QPointer<WallpaperListModel> guard(this);
-    m_client->getSpace(queryMode, [guard, generation, revision](const Daemon::Response &response) {
-        if (!guard || generation != guard->m_loadGeneration)
-            return;
-        const bool again = guard->m_reloadPending || revision != guard->m_contentRevision;
-        if (!again && response.type == Daemon::ResponseType::Space) {
+    auto received = [guard, generation, revision, result](const Daemon::Response &response) {
+        if (!guard || generation != guard->m_loadGeneration) return;
+        if (response.type == Daemon::ResponseType::Space) {
             const auto space = response.asSpace();
+            result->items += space.items;
+            if (result->mode.isEmpty()) result->mode = Daemon::wallModeToString(space.mode);
+        } else result->error = response.asError().message;
+        if (--result->remaining) return;
+        const bool again = guard->m_reloadPending || revision != guard->m_contentRevision;
+        if (!again && result->error.isEmpty()) {
             guard->beginResetModel();
-            guard->m_items = space.items;
+            guard->m_items.clear(); guard->m_modifiedTimes.clear();
+            QSet<QString> paths;
+            for (const auto &item : result->items) {
+                if (paths.contains(item.path)) continue;
+                paths.insert(item.path); guard->m_items.append(item);
+                guard->m_modifiedTimes.insert(item.path, QFileInfo(item.path).lastModified().toMSecsSinceEpoch());
+            }
+            guard->m_mode = result->mode;
             guard->endResetModel();
-            ++guard->m_refreshToken;
-            emit guard->refreshTokenChanged();
-            guard->m_mode = Daemon::wallModeToString(space.mode);
-            emit guard->modeChanged();
-            emit guard->countChanged();
-        } else if (response.type == Daemon::ResponseType::Error) {
-            emit guard->errorOccurred(response.asError().message);
-        }
-        if (!guard)
-            return;
-        guard->m_loading = false;
-        guard->m_reloadPending = false;
+            ++guard->m_refreshToken; emit guard->refreshTokenChanged();
+            emit guard->modeChanged(); emit guard->countChanged();
+        } else if (!result->error.isEmpty()) emit guard->errorOccurred(result->error);
+        if (!guard) return;
+        guard->m_loading = false; guard->m_reloadPending = false;
         emit guard->loadingChanged();
-        if (guard && again && !guard->m_loading && guard->m_client->isConnected())
-            guard->load(guard->m_requestedMode);
+        if (guard && again && guard->m_client->isConnected()) guard->load(guard->m_requestedMode);
+    };
+    if (all) {
+        m_client->getSpace(Daemon::WallMode::Video, received);
+        m_client->getSpace(Daemon::WallMode::Image, received);
+    } else {
+        m_client->getSpace(mode.isEmpty() ? std::nullopt : std::optional<Daemon::WallMode>(Daemon::wallModeFromString(mode)), received);
+    }
+}
+
+void WallpaperListModel::refreshMetadata()
+{
+    if (!m_client->isConnected()) return;
+    if (m_metadataLoading) { m_metadataAgain = true; return; }
+    m_metadataLoading = true; m_metadataAgain = false; m_metadataRestarts = 0;
+    m_metadataRevision = -1; m_metadataBuffer.clear();
+    metadataPage(0, ++m_metadataGeneration);
+}
+
+void WallpaperListModel::metadataPage(int offset, quint64 generation)
+{
+    const QPointer<WallpaperListModel> guard(this);
+    m_client->query("GetLibrary", {{"offset", offset}, {"limit", 128}}, [guard, offset, generation](const Daemon::Response &response) {
+        if (!guard || generation != guard->m_metadataGeneration) return;
+        auto finish = [guard]() {
+            guard->m_metadataLoading = false;
+            emit guard->metadataChanged();
+            if (!guard) return;
+            if (!guard->m_items.isEmpty()) emit guard->dataChanged(guard->index(0), guard->index(guard->m_items.size() - 1));
+            if (guard && guard->m_metadataAgain) guard->refreshMetadata();
+        };
+        if (response.type != Daemon::ResponseType::Library) {
+            guard->m_metadataUnsupported = response.type == Daemon::ResponseType::Error && response.asError().code == Daemon::ErrorCode::InvalidRequest;
+            guard->m_metadataError = response.asError().message;
+            guard->m_metadataAvailable = false; finish(); return;
+        }
+        const auto payload = response.payload;
+        if (payload.value("schema_version").toInt() != 1) {
+            guard->m_metadataUnsupported = true;
+            guard->m_metadataAvailable = false; guard->m_metadataError = tr("不支持的资料库版本"); finish(); return;
+        }
+        const qint64 revision = payload.value("revision").toInteger();
+        if (offset && revision != guard->m_metadataRevision) {
+            if (++guard->m_metadataRestarts <= 2) {
+                guard->m_metadataBuffer.clear(); guard->m_metadataRevision = -1;
+                guard->metadataPage(0, generation); return;
+            }
+            guard->m_metadataError = tr("资料库正在更新，请稍后刷新"); finish(); return;
+        }
+        guard->m_metadataRevision = revision;
+        for (const auto &value : payload.value("entries").toArray()) {
+            const auto entry = value.toObject(); guard->m_metadataBuffer.insert(entry.value("path").toString(), entry.toVariantMap());
+        }
+        const auto next = payload.value("next_offset");
+        if (next.isDouble()) {
+            const int cursor = next.toInt(-1);
+            if (cursor <= offset || guard->m_metadataBuffer.size() > 200000) {
+                guard->m_metadataError = tr("资料库分页响应无效或过大"); finish(); return;
+            }
+            guard->metadataPage(cursor, generation); return;
+        }
+        guard->m_metadata = std::move(guard->m_metadataBuffer);
+        guard->m_metadataUnsupported = false;
+        guard->m_metadataAvailable = true;
+        guard->m_metadataError = payload.value("persistence_error").toString();
+        finish();
+    });
+}
+
+void WallpaperListModel::setFavorite(const QString &path, bool favorite)
+{
+    if (!m_client->isConnected() || !m_metadataAvailable || !m_metadata.contains(path) || m_pendingFavorites.contains(path)) return;
+    m_pendingFavorites.insert(path); emit metadataChanged();
+    const quint64 epoch = m_metadataEpoch;
+    const QPointer<WallpaperListModel> guard(this);
+    m_client->query("SetFavorite", {{"path", path}, {"favorite", favorite}}, [guard, path, epoch](const Daemon::Response &response) {
+        if (!guard) return;
+        // Pending requests are failed at disconnect; never accept an old session's result.
+        if (!guard->m_client->isConnected() || epoch != guard->m_metadataEpoch) return;
+        guard->m_pendingFavorites.remove(path); emit guard->metadataChanged();
+        if (!guard) return;
+        if (response.type == Daemon::ResponseType::Error) emit guard->errorOccurred(response.asError().message);
+        else guard->refreshMetadata();
     });
 }
 
@@ -235,24 +350,55 @@ WallpaperFilterModel::WallpaperFilterModel(QObject *parent)
     connect(this, &QAbstractItemModel::layoutChanged, this, &WallpaperFilterModel::countChanged);
 }
 
+void WallpaperFilterModel::setSortKey(const QString &key)
+{
+    static const QHash<QString, int> roles{{"name", WallpaperListModel::FilenameRole}, {"modified", WallpaperListModel::ModifiedRole}, {"added", WallpaperListModel::AddedAtRole},
+        {"count", WallpaperListModel::PlayCountRole}, {"duration", WallpaperListModel::DisplaySecondsRole}, {"recent", WallpaperListModel::LastUsedRole}};
+    if (!roles.contains(key) || key == m_sortKey) return;
+    m_sortKey = key;
+    setSortRole(roles.value(key));
+    sort(0, key == QLatin1String("name") ? Qt::AscendingOrder : Qt::DescendingOrder);
+    emit sortKeyChanged();
+}
+
+bool WallpaperFilterModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
+{
+    if (m_sortKey != QLatin1String("name")) {
+        const auto a = left.data(sortRole()).toULongLong();
+        const auto b = right.data(sortRole()).toULongLong();
+        if (a != b) return a < b;
+    }
+    const int name = QString::localeAwareCompare(left.data(WallpaperListModel::FilenameRole).toString(), right.data(WallpaperListModel::FilenameRole).toString());
+    return name ? name < 0 : left.data(WallpaperListModel::PathRole).toString() < right.data(WallpaperListModel::PathRole).toString();
+}
+
+void WallpaperFilterModel::setFavoritesOnly(bool value)
+{
+    if (m_favoritesOnly == value) return;
+    beginFilterChange();
+    m_favoritesOnly = value;
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    emit favoritesOnlyChanged();
+}
+
 void WallpaperFilterModel::setSearchText(const QString &text)
 {
     if (m_searchText == text)
         return;
-    m_searchText = text;
-    emit searchTextChanged();
     beginFilterChange();
-    endFilterChange();
+    m_searchText = text;
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    emit searchTextChanged();
 }
 
 void WallpaperFilterModel::setLockFilter(int filter)
 {
     if (m_lockFilter == filter)
         return;
-    m_lockFilter = filter;
-    emit lockFilterChanged();
     beginFilterChange();
-    endFilterChange();
+    m_lockFilter = filter;
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    emit lockFilterChanged();
 }
 
 bool WallpaperFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const
@@ -263,10 +409,12 @@ bool WallpaperFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &so
 
     auto idx = srcModel->index(sourceRow, 0, sourceParent);
 
+    if (m_favoritesOnly && !idx.data(WallpaperListModel::FavoriteRole).toBool()) return false;
+
     // 搜索过滤（文件名）
     if (!m_searchText.isEmpty()) {
         auto filename = idx.data(WallpaperListModel::FilenameRole).toString();
-        if (!filename.contains(m_searchText, Qt::CaseInsensitive))
+        if (!filename.contains(m_searchText, Qt::CaseInsensitive) && !idx.data(WallpaperListModel::PathRole).toString().contains(m_searchText, Qt::CaseInsensitive))
             return false;
     }
 

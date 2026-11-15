@@ -4,6 +4,7 @@
 #include <QPair>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QCoreApplication>
 #include <QStandardPaths>
 
@@ -13,7 +14,7 @@ namespace LianwallGui {
 // 版本信息
 // ============================================================================
 constexpr const char* APP_NAME = "LianWall";
-constexpr const char* APP_VERSION = "1.6.0";
+constexpr const char* APP_VERSION = "2.0.0";
 constexpr const char* APP_AUTHOR = "Lian";
 constexpr const char* APP_GITHUB_GUI = "https://github.com/Yueosa/lianwall-gui";
 constexpr const char* APP_GITHUB_DAEMON = "https://github.com/Yueosa/lianwall";
@@ -60,12 +61,17 @@ namespace Paths {
     }
     
     /// 查找 lianwalld 可执行文件
+    /// LIANWALL_DAEMON_EXECUTABLE explicitly pins a development/portable daemon.
     /// 搜索顺序：
     ///   1. /usr/bin/lianwalld          — AUR / pacman 系统安装
     ///   2. ~/.local/bin/lianwalld      — 用户本地安装
     ///   3. <自身所在目录>/lianwalld     — 开发 / 便携场景
     /// 若均未找到，回退到裸名 "lianwalld"（依赖 PATH）
     inline QString findLianwalld() {
+        const auto pinned = qEnvironmentVariable("LIANWALL_DAEMON_EXECUTABLE");
+        if (!pinned.isEmpty())
+            return QFileInfo(pinned).absoluteFilePath();
+
         // 1. 系统路径
         const QString sys = QStringLiteral("/usr/bin/lianwalld");
         if (QFile::exists(sys))
