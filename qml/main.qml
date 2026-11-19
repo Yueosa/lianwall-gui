@@ -8,8 +8,8 @@ import "pages" as Pages
 ApplicationWindow {
     id: root
     objectName: "mainWindow"
-    width: 1280; height: 720
-    minimumWidth: 840; minimumHeight: 600
+    width: Math.min(1080, Screen.desktopAvailableWidth); height: Math.min(640, Screen.desktopAvailableHeight)
+    minimumWidth: 760; minimumHeight: 520
     visible: false
     title: "LianWall"
     font.pixelSize: 13
@@ -76,12 +76,12 @@ ApplicationWindow {
             anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
             spacing: 4
             C.UiButton { iconName: App.Theme.isDark ? "sun" : "moon"; kind: "flat"; hint: qsTr("切换深浅主题"); onClicked: ConfigManager.setTheme(App.Theme.isDark ? "lian" : "lian-dark") }
-            C.UiButton { iconName: "more"; kind: "flat"; hint: qsTr("应用菜单"); onClicked: appMenu.open() }
+            C.UiButton { id: menuButton; iconName: "more"; kind: "flat"; hint: qsTr("应用菜单"); onClicked: appMenu.open() }
         }
     }
     StackLayout {
         anchors.fill: parent
-        anchors.margins: 16
+        anchors.margins: root.width >= 1000 ? 24 : 16
         currentIndex: root.currentPage
         Pages.PlayerPage { onNavigate: function(page) { root.currentPage = page } }
         Pages.LibraryPage { activated: root.currentPage === 1 }
@@ -89,71 +89,66 @@ ApplicationWindow {
         Pages.AutomationPage {}
         Pages.PreferencesPage {}
     }
-    footer: ColumnLayout {
-        spacing: 0
-        Rectangle {
-            Layout.fillWidth: true; implicitHeight: 58; color: App.Theme.surface
-            Rectangle { width: parent.width; height: 1; color: App.Theme.border }
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16
-                spacing: 12
-                Image { Layout.preferredWidth: 52; Layout.preferredHeight: 34; source: DaemonState.currentPath ? "image://thumbnail/" + encodeURIComponent(DaemonState.currentPath) : ""; sourceSize: Qt.size(320, 180); fillMode: Image.PreserveAspectFit; asynchronous: true }
-                ColumnLayout {
-                    Layout.fillWidth: true; spacing: 3
-                    Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: DaemonState.currentFilename || qsTr("暂无壁纸"); color: App.Theme.text; font.pixelSize: 11; elide: Text.ElideMiddle }
-                    Text { textFormat: Text.PlainText; text: root.busy ? qsTr("正在切换，等待确认…") : DaemonState.engine; font.pixelSize: 10; color: App.Theme.textSecondary }
-                }
-                C.UiButton { iconName: "prev"; kind: "flat"; hint: qsTr("上一张壁纸"); enabled: DaemonState.daemonConnected && !root.busy; onClicked: LianwallApp.daemonPrev() }
-                C.UiButton { text: Frontend.rotationPaused ? (Frontend.temporaryPause ? qsTr("恢复轮换") : qsTr("轮换已关闭")) : qsTr("暂停轮换"); iconName: Frontend.rotationPaused ? "refresh" : "pause"; kind: "tonal"; hint: qsTr("只控制自动轮换，视频继续播放"); enabled: DaemonState.daemonConnected; onClicked: { if (Frontend.rotationPaused && !Frontend.temporaryPause) root.currentPage = 4; else Frontend.toggleRotation() } }
-                C.UiButton { iconName: "next"; kind: "flat"; hint: qsTr("下一张壁纸"); enabled: DaemonState.daemonConnected && !root.busy; onClicked: LianwallApp.daemonNext() }
-                Item { Layout.fillWidth: true }
-                Text { textFormat: Text.PlainText; text: root.busy ? qsTr("切换中") : Frontend.runtime.phase === "failed" ? qsTr("引擎已停止") : DaemonState.daemonConnected ? qsTr("服务运行中") : qsTr("未连接"); font.pixelSize: 10; color: Frontend.runtime.phase === "failed" ? App.Theme.error : App.Theme.textSecondary }
-            }
-        }
-        Rectangle {
-            Layout.fillWidth: true; implicitHeight: 24; color: App.Theme.input
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-                spacing: 7
-                Rectangle { width: 5; height: 5; radius: 3; color: DaemonState.daemonConnected ? App.Theme.success : App.Theme.error }
-                Text { textFormat: Text.PlainText; text: DaemonState.daemonConnected ? qsTr("壁纸服务已连接") : qsTr("壁纸服务未连接"); color: App.Theme.textSecondary; font.pixelSize: 10 }
-                Text { textFormat: Text.PlainText; text: "· " + (Frontend.runtime.decoder || DaemonState.engine); color: App.Theme.textSecondary; font.pixelSize: 10 }
-                Item { Layout.fillWidth: true }
-                Text { textFormat: Text.PlainText; text: "LianWall · " + AppVersion; color: App.Theme.textSecondary; font.pixelSize: 10 }
-            }
-        }
-    }
     Shortcut { sequence: "Alt+1"; onActivated: root.currentPage = 0 }
     Shortcut { sequence: "Alt+2"; onActivated: root.currentPage = 1 }
     Shortcut { sequence: "Alt+3"; onActivated: root.currentPage = 2 }
     Shortcut { sequence: "Alt+4"; onActivated: root.currentPage = 3 }
     Shortcut { sequence: "Alt+5"; onActivated: root.currentPage = 4 }
+    component ActionMenuItem: MenuItem {
+        id: item
+        implicitHeight: 40
+        leftPadding: 14; rightPadding: 14
+        contentItem: Text {
+            text: item.text; color: item.enabled ? App.Theme.text : App.Theme.textDisabled
+            font.pixelSize: 13; verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            radius: 0
+            color: item.highlighted || item.hovered ? App.Theme.cardHover : "transparent"
+        }
+    }
     Menu {
         id: appMenu
-        x: root.width - width - 12; y: 50
-        MenuItem { text: qsTr("关于 LianWall"); onTriggered: about.open() }
-        MenuItem { text: qsTr("打开配置目录"); onTriggered: ConfigManager.openDirectory(ConfigManager.configDirPath()) }
-        MenuSeparator {}
-        MenuItem { text: qsTr("退出 GUI 与服务"); onTriggered: LianwallApp.quit() }
+        parent: menuButton
+        x: menuButton.width - width; y: menuButton.height + 6
+        popupType: Popup.Item
+        width: 192; padding: 6
+        background: Rectangle { color: App.Theme.surface; radius: 0; border.color: App.Theme.border }
+        ActionMenuItem { text: qsTr("关于 LianWall"); onTriggered: about.open() }
+        ActionMenuItem { text: qsTr("重启服务"); enabled: DaemonState.daemonConnected; onTriggered: LianwallApp.restartService() }
+        ActionMenuItem { text: qsTr("退出 GUI 与服务"); onTriggered: LianwallApp.quit() }
     }
-    Dialog {
+    Popup {
         id: about
-        title: qsTr("关于 LianWall")
-        anchors.centerIn: parent
-        width: 410; modal: true; standardButtons: Dialog.Close
-        background: Rectangle { color: App.Theme.surface; radius: 12; border.color: App.Theme.border }
-        ColumnLayout {
-            width: parent.width; spacing: 12
-            Image { source: "qrc:/icons/lianwall.png"; Layout.preferredWidth: 88; Layout.preferredHeight: 88; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit }
-            Text { textFormat: Text.PlainText; text: "LianWall"; font.pixelSize: 25; color: App.Theme.text; Layout.alignment: Qt.AlignHCenter }
-            Text { textFormat: Text.PlainText; text: qsTr("壁纸、图片 / 视频播放与桌面自动化"); font.pixelSize: 12; color: App.Theme.textSecondary; Layout.alignment: Qt.AlignHCenter }
-            Text { textFormat: Text.PlainText; text: "GUI " + AppVersion + " · " + AppAuthor; font.pixelSize: 11; color: App.Theme.textSecondary; Layout.alignment: Qt.AlignHCenter }
+        parent: Overlay.overlay; anchors.centerIn: parent
+        width: Math.min(448, root.width - 48); padding: 24
+        modal: true; focus: true
+        background: Rectangle { color: App.Theme.surface; radius: 16; border.color: App.Theme.border }
+        contentItem: ColumnLayout {
+            spacing: 18
+            RowLayout {
+                spacing: 16
+                Image { source: "qrc:/icons/lianwall.png"; Layout.preferredWidth: 56; Layout.preferredHeight: 56; fillMode: Image.PreserveAspectFit }
+                ColumnLayout {
+                    Layout.fillWidth: true; spacing: 5
+                    Text { text: "LianWall"; font.pixelSize: 25; font.weight: Font.DemiBold; color: App.Theme.text }
+                    Text { text: "GUI " + AppVersion + "  ·  " + AppAuthor; color: App.Theme.textSecondary }
+                }
+            }
+            Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: App.Theme.border }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 8
+                C.UiButton { text: "GitHub · CLI"; onClicked: Qt.openUrlExternally("https://github.com/Yueosa/lianwall") }
+                C.UiButton { text: "GitHub · GUI"; onClicked: Qt.openUrlExternally("https://github.com/Yueosa/lianwall-gui") }
+                Item { Layout.fillWidth: true }
+                C.UiButton { text: qsTr("关闭"); kind: "tonal"; onClicked: about.close() }
+            }
         }
     }
     Popup {
         id: toast
-        anchors.centerIn: Overlay.overlay
-        y: root.height - height - 110
+        x: (root.width - width) / 2
+        y: root.height - height - 20
         width: Math.min(root.width - 60, 600)
         padding: 14
         background: Rectangle { color: App.Theme.text; radius: 10 }

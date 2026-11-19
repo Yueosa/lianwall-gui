@@ -10,41 +10,36 @@ Item {
     readonly property var runtime: Frontend.runtime
     readonly property bool busy: LianwallApp.wallpaperSwitching || runtime.phase === "preparing"
     Connections { target: DaemonState; function onWallpaperChanged() { root.refreshToken++ } }
-    ColumnLayout {
-        anchors.fill: parent
+    Column {
+        width: parent.width
         spacing: 12
         RowLayout {
-            Layout.fillWidth: true
+            id: header
+            width: parent.width
             Text { textFormat: Text.PlainText; text: qsTr("正在播放"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.DemiBold }
             Text { textFormat: Text.PlainText; text: qsTr("当前壁纸与轮换控制"); color: App.Theme.textSecondary; font.pixelSize: 11 }
             Item { Layout.fillWidth: true }
             C.UiButton { text: root.runtime.output || DaemonState.engine || qsTr("未连接"); iconName: "player"; onClicked: root.navigate(2) }
         }
-        RowLayout {
-            Layout.fillWidth: true; Layout.fillHeight: true
-            spacing: 14
-            ColumnLayout {
-                id: previewColumn
-                Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0; Layout.preferredWidth: 1; Layout.alignment: Qt.AlignTop
-                spacing: 13
-                Item {
-                    id: previewSpace
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 0
-                    Layout.preferredHeight: Math.min(width * 9 / 16, Math.max(120, previewColumn.height - 130))
+        Item {
+            id: stage
+            width: parent.width
+            readonly property real imageWidth: width - sideScroll.width - 14
+            height: root.height - header.height - details.height - 24
+            Item {
+                width: stage.imageWidth
+                height: stage.height
                     Rectangle {
                     id: previewFrame
                     objectName: "playerPreviewFrame"
-                    anchors.centerIn: parent
-                    width: Math.min(parent.width, parent.height * 16 / 9)
-                    height: width * 9 / 16
+                    anchors.fill: parent
                     color: App.Theme.cardHover; radius: 12; clip: true
                     Image {
                         id: preview
                         anchors.fill: parent
                         source: DaemonState.currentPath ? "image://thumbnail/" + encodeURIComponent(DaemonState.currentPath) + "?t=" + root.refreshToken : ""
                         sourceSize: Qt.size(1280, 720)
-                        fillMode: Image.PreserveAspectFit
+                        fillMode: Image.PreserveAspectCrop
                         asynchronous: true; cache: false
                     }
                     Text { textFormat: Text.PlainText;
@@ -62,45 +57,21 @@ Item {
                         }
                     }
                 }
-                }
-                ColumnLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: previewFrame.width
-                    spacing: 6
-                    visible: DaemonState.currentPath.length > 0
-                    Text { Layout.fillWidth: true; textFormat: Text.PlainText; text: DaemonState.currentFilename; color: App.Theme.text; font.pixelSize: 19; elide: Text.ElideMiddle }
-                    Text { Layout.fillWidth: true; textFormat: Text.PlainText; text: DaemonState.currentPath; color: App.Theme.textSecondary; font.pixelSize: 10; elide: Text.ElideMiddle }
-                }
-                RowLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: previewFrame.width
-                    Repeater {
-                        model: [qsTr("实际引擎"), qsTr("实际解码"), qsTr("当前模式")]
-                        ColumnLayout {
-                            required property int index
-                            required property string modelData
-                            Layout.fillWidth: true
-                            spacing: 5
-                            Text { textFormat: Text.PlainText; text: modelData; font.pixelSize: 10; color: App.Theme.textSecondary }
-                            Text { textFormat: Text.PlainText;
-                                text: index === 0 ? DaemonState.engine : index === 1 ? (root.runtime.decoder === "vulkan" ? qsTr("Vulkan 硬解") : root.runtime.decoder === "software" ? qsTr("软件解码") : "—") : (DaemonState.mode === "Video" ? qsTr("视频") : qsTr("图片"))
-                                color: App.Theme.text; font.pixelSize: 12
-                            }
-                        }
-                    }
-                }
-                Item { Layout.fillHeight: true }
             }
             ScrollView {
+                ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                 id: sideScroll
                 objectName: "playerSidebar"
-                Layout.preferredWidth: 280; Layout.minimumWidth: 280; Layout.maximumWidth: 280; Layout.fillHeight: true
+                anchors.right: parent.right; width: Math.max(244, Math.min(320, stage.width * 0.30)); height: stage.height
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {
+                    id: sideContent
                     width: sideScroll.availableWidth
                     spacing: 12
                     C.UiCard {
+                        id: rotationCard
                         Layout.fillWidth: true
                         ColumnLayout {
                             width: parent.width; spacing: 11
@@ -121,39 +92,79 @@ Item {
                     }
                     C.UiCard {
                         Layout.fillWidth: true
-                        ColumnLayout {
-                            width: parent.width; spacing: 12
+                        Layout.preferredHeight: Math.max(144, stage.height - rotationCard.height - sideContent.spacing)
+                        Column {
+                            width: parent.width
+                            spacing: 10
+                            Text { text: qsTr("显存占用"); color: App.Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
                             RowLayout {
-                                Layout.fillWidth: true
-                                Text { textFormat: Text.PlainText; text: qsTr("自动化状态"); font.pixelSize: 14; color: App.Theme.text; font.weight: Font.DemiBold }
-                                Item { Layout.fillWidth: true }
-                                C.UiButton { iconName: "chevron"; kind: "flat"; onClicked: root.navigate(3) }
-                            }
-                            Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: Frontend.hooksError || qsTr("已配置 %1 条 Hook 规则").arg(Frontend.hooks.length); color: App.Theme.textSecondary; font.pixelSize: 11; wrapMode: Text.Wrap }
-                            Repeater {
-                                model: Frontend.hooks.slice(0, 2)
-                                RowLayout {
-                                    required property var modelData
+                                width: parent.width
+                                spacing: 12
+                                Item {
+                                    id: gauge
+                                    readonly property real total: DaemonState.daemonConnected ? DaemonState.vramTotalMb : 0
+                                    readonly property real used: Math.min(total, DaemonState.vramUsedMb)
+                                    readonly property real fraction: total > 0 ? used / total : 0
+                                    Layout.preferredWidth: Math.min(124, Math.max(74, stage.height - rotationCard.height - 96), parent.width * 0.46)
+                                    Layout.preferredHeight: width
+                                    Canvas {
+                                        anchors.fill: parent
+                                        property real fraction: gauge.fraction
+                                        property color track: App.Theme.border
+                                        property color usedColor: App.Theme.accent
+                                        property color freeColor: App.Theme.success
+                                        property bool available: gauge.total > 0
+                                        onFractionChanged: requestPaint()
+                                        onTrackChanged: requestPaint()
+                                        onUsedColorChanged: requestPaint()
+                                        onFreeColorChanged: requestPaint()
+                                        onAvailableChanged: requestPaint()
+                                        onPaint: {
+                                            const ctx = getContext("2d")
+                                            ctx.clearRect(0, 0, width, height)
+                                            const center = width / 2
+                                            function ring(radius, thickness, part, ink) {
+                                                ctx.lineWidth = thickness
+                                                ctx.lineCap = "round"
+                                                for (const [amount, color] of [[1, track], [part, ink]]) {
+                                                    if (amount <= 0) continue
+                                                    ctx.beginPath()
+                                                    ctx.strokeStyle = color
+                                                    ctx.arc(center, center, radius, -Math.PI / 2, Math.PI * (2 * amount - 0.5))
+                                                    ctx.stroke()
+                                                }
+                                            }
+                                            ring(center * 0.9, width * 0.067, fraction, usedColor)
+                                            ring(center * 0.70, width * 0.038, available ? 1 - fraction : 0, freeColor)
+                                        }
+                                    }
+                                    Text { anchors.centerIn: parent; text: gauge.total ? Math.round(gauge.fraction * 100) + "%" : "—"; color: App.Theme.text; font.pixelSize: Math.round(parent.width * 0.21); font.weight: Font.DemiBold }
+                                }
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    C.UiIcon { name: "automation" }
-                                    Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: modelData.name; font.pixelSize: 11; color: App.Theme.text; elide: Text.ElideRight }
-                                    Text { textFormat: Text.PlainText; text: modelData.enabled ? qsTr("启用") : qsTr("停用"); color: App.Theme.textSecondary; font.pixelSize: 10 }
+                                    spacing: 6
+                                    Text { text: qsTr("已用") + "  " + (gauge.total ? gauge.used + " MB" : "—"); color: App.Theme.accent; font.pixelSize: 12 }
+                                    Text { text: qsTr("可用") + "  " + (gauge.total ? (gauge.total - gauge.used) + " MB" : "—"); color: App.Theme.success; font.pixelSize: 12 }
+                                    Text { text: gauge.total ? qsTr("总计") + "  " + gauge.total + " MB" : qsTr("暂无显存读数"); color: App.Theme.textSecondary; font.pixelSize: 11 }
                                 }
                             }
                         }
                     }
-                    C.UiCard {
-                        Layout.fillWidth: true
-                        ColumnLayout {
-                            width: parent.width; spacing: 10
-                            Text { textFormat: Text.PlainText; text: qsTr("显存状态"); color: App.Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { textFormat: Text.PlainText; text: DaemonState.vramTotalMb > 0 ? qsTr("整卡已用 %1 / %2 MB").arg(DaemonState.vramUsedMb).arg(DaemonState.vramTotalMb) : qsTr("暂无显存读数"); color: App.Theme.textSecondary; font.pixelSize: 11 }
-                            ProgressBar { Layout.fillWidth: true; value: DaemonState.vramTotalMb > 0 ? DaemonState.vramUsedMb / DaemonState.vramTotalMb : 0 }
-                            Text { textFormat: Text.PlainText; text: DaemonState.vramDegraded ? qsTr("显存降级中") : qsTr("未降级"); color: DaemonState.vramDegraded ? App.Theme.warning : App.Theme.success; font.pixelSize: 11 }
-                        }
-                    }
                 }
             }
+        }
+        RowLayout {
+            id: details
+            width: parent.width
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Text { Layout.fillWidth: true; textFormat: Text.PlainText; text: DaemonState.currentFilename || qsTr("暂无壁纸"); color: App.Theme.text; font.pixelSize: 19; elide: Text.ElideMiddle }
+                    Text { Layout.fillWidth: true; textFormat: Text.PlainText; text: DaemonState.currentPath || (DaemonState.daemonConnected ? "" : qsTr("壁纸服务未连接")); color: App.Theme.textSecondary; font.pixelSize: 10; elide: Text.ElideMiddle }
+                }
+                C.UiButton { iconName: "prev"; kind: "flat"; hint: qsTr("上一张壁纸"); enabled: DaemonState.daemonConnected && !root.busy; onClicked: LianwallApp.daemonPrev() }
+                C.UiButton { text: Frontend.rotationPaused ? (Frontend.temporaryPause ? qsTr("恢复轮换") : qsTr("轮换已关闭")) : qsTr("暂停轮换"); iconName: Frontend.rotationPaused ? "refresh" : "pause"; kind: "tonal"; hint: qsTr("只控制自动轮换，视频继续播放"); enabled: DaemonState.daemonConnected; onClicked: { if (Frontend.rotationPaused && !Frontend.temporaryPause) root.navigate(4); else Frontend.toggleRotation() } }
+                C.UiButton { iconName: "next"; kind: "flat"; hint: qsTr("下一张壁纸"); enabled: DaemonState.daemonConnected && !root.busy; onClicked: LianwallApp.daemonNext() }
         }
     }
 }

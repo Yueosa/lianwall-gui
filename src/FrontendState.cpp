@@ -2,6 +2,8 @@
 #include "DaemonClient.h"
 #include "Constants.h"
 #include <QDesktopServices>
+#include <QDir>
+#include <QProcess>
 #include <QUrl>
 #include <QPointer>
 #include <QTimer>
@@ -229,16 +231,33 @@ bool FrontendState::exportLogsTo(const QString &path)
 
 void FrontendState::openLogsDirectory()
 {
-    if (!m_logPath.isEmpty()) openPath(QFileInfo(m_logPath).absolutePath());
+    const auto base = qEnvironmentVariable("XDG_STATE_HOME", QDir::homePath() + QStringLiteral("/.local/state"));
+    const auto directory = m_logPath.isEmpty() ? QDir(base).filePath(QStringLiteral("lianwall"))
+                                               : QFileInfo(m_logPath).absolutePath();
+    if (!QDir().mkpath(directory)) {
+        emit operationError(tr("无法创建日志目录：%1").arg(directory));
+        return;
+    }
+    openPath(directory);
 }
 
 void FrontendState::openPath(const QString &path)
 {
-    if (!path.isEmpty()) QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    if (!path.isEmpty() && !QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+        emit operationError(tr("无法打开：%1").arg(path));
 }
 
 void FrontendState::openHooksFile()
 {
     const auto file = LianwallGui::Paths::configDir() + QStringLiteral("/hooks.toml");
-    openPath(QFileInfo::exists(file) ? file : LianwallGui::Paths::configDir());
+    if (!QFileInfo::exists(file)) {
+        emit operationError(tr("未找到 Hook 配置：%1").arg(file));
+        return;
+    }
+    const auto terminal = QStandardPaths::findExecutable(QStringLiteral("kitty"));
+    const auto editor = QStandardPaths::findExecutable(QStringLiteral("nvim"));
+    if (!terminal.isEmpty() && !editor.isEmpty()
+        && QProcess::startDetached(terminal, {editor, file}))
+        return;
+    openPath(file);
 }

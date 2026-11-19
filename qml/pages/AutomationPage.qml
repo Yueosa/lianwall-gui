@@ -27,14 +27,13 @@ Item {
                     Text { textFormat: Text.PlainText; text: qsTr("规则列表"); color: App.Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
                     Text { textFormat: Text.PlainText; text: qsTr("%1 条规则").arg(Frontend.hooks.length); color: App.Theme.textSecondary; font.pixelSize: 11 }
                     Item { Layout.fillWidth: true }
-                    C.UiButton { iconName: "refresh"; kind: "flat"; enabled: DaemonState.daemonConnected; onClicked: Frontend.refreshHooks() }
                 }
                 ListView {
                     id: list
                     Layout.fillWidth: true; Layout.fillHeight: true
                     model: Frontend.hooks
                     clip: true; spacing: 0
-                    ScrollBar.vertical: ScrollBar {}
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOff }
                     delegate: Item {
                         required property var modelData
                         width: list.width; height: 88
@@ -65,13 +64,14 @@ Item {
     Dialog {
         id: details
         property var hook: ({})
-        title: hook.name || qsTr("规则详情")
+
         anchors.centerIn: parent
         width: Math.min(560, root.width - 30)
-        modal: true; standardButtons: Dialog.Close
+        modal: true; footer: C.UiButton { text: qsTr("关闭"); kind: "tonal"; onClicked: details.close() }
         background: Rectangle { color: App.Theme.surface; radius: 12; border.color: App.Theme.border }
         ColumnLayout {
             width: parent.width
+            Text { text: details.hook.name || qsTr("规则详情"); textFormat: Text.PlainText; color: App.Theme.text; font.pixelSize: 16 }
             Text { textFormat: Text.PlainText; text: details.hook.on || ""; color: App.Theme.accent; font.pixelSize: 12 }
             TextArea { Layout.fillWidth: true; text: details.hook.command || ""; readOnly: true; wrapMode: TextEdit.WrapAnywhere; color: App.Theme.text; font.family: "monospace"; font.pixelSize: 12; selectByMouse: true; background: Rectangle { color: App.Theme.input; radius: 7 } }
             Text { textFormat: Text.PlainText; text: qsTr("超时：%1 秒").arg(details.hook.timeout || 0); color: App.Theme.textSecondary; font.pixelSize: 11 }

@@ -173,7 +173,8 @@
             <source>超时：%1 秒</source>
             <translation>超时：%1 秒</translation>
         </message>
-    </context>
+        <message><source>关闭</source><translation>关闭</translation></message>
+</context>
     <context>
         <name>ConfigManager</name>
         <message>
@@ -560,7 +561,10 @@
             <source>导出失败：%1</source>
             <translation>导出失败：%1</translation>
         </message>
-    </context>
+        <message><source>无法打开：%1</source><translation>无法打开：%1</translation></message>
+    <message><source>无法创建日志目录：%1</source><translation>无法创建日志目录：%1</translation></message>
+    <message><source>未找到 Hook 配置：%1</source><translation>未找到 Hook 配置：%1</translation></message>
+</context>
     <context>
         <name>LibraryPage</name>
         <message>
@@ -727,7 +731,9 @@
             <source>连接壁纸服务后查看媒体库。</source>
             <translation>连接壁纸服务后查看媒体库。</translation>
         </message>
-    </context>
+        <message><source>打开图片目录</source><translation>打开图片目录</translation></message>
+    <message><source>打开视频目录</source><translation>打开视频目录</translation></message>
+</context>
     <context>
         <name>NavBar</name>
         <message>
@@ -941,7 +947,19 @@
             <source>未降级</source>
             <translation>未降级</translation>
         </message>
-    </context>
+        <message><source>整卡已用 %1% · %2 / %3 MB</source><translation>整卡已用 %1% · %2 / %3 MB</translation></message>
+    <message><source>暂无壁纸</source><translation>暂无壁纸</translation></message>
+    <message><source>上一张壁纸</source><translation>上一张壁纸</translation></message>
+    <message><source>下一张壁纸</source><translation>下一张壁纸</translation></message>
+    <message><source>恢复轮换</source><translation>恢复轮换</translation></message>
+    <message><source>轮换已关闭</source><translation>轮换已关闭</translation></message>
+    <message><source>暂停轮换</source><translation>暂停轮换</translation></message>
+    <message><source>只控制自动轮换，视频继续播放</source><translation>只控制自动轮换，视频继续播放</translation></message>
+    <message><source>显存占用</source><translation>显存占用</translation></message>
+    <message><source>已用</source><translation>已用</translation></message>
+    <message><source>可用</source><translation>可用</translation></message>
+    <message><source>总计</source><translation>总计</translation></message>
+</context>
     <context>
         <name>PreferencesPage</name>
         <message>
@@ -1275,7 +1293,13 @@
             <source>暂无可读取的日志。请确认服务支持日志读取接口。</source>
             <translation>暂无可读取的日志。请确认服务支持日志读取接口。</translation>
         </message>
-    </context>
+        <message><source>跟随系统</source><translation>跟随系统</translation></message>
+    <message><source>显存读取测试</source><translation>显存读取测试</translation></message>
+    <message><source>正在读取…</source><translation>正在读取…</translation></message>
+    <message><source>尚未测试</source><translation>尚未测试</translation></message>
+    <message><source>已用 %1 / %2 MB</source><translation>已用 %1 / %2 MB</translation></message>
+    <message><source>只决定服务启动时的模式；播放页可切换当前会话。</source><translation>只决定服务启动时的模式；播放页可切换当前会话。</translation></message>
+</context>
     <context>
         <name>SettingsPage</name>
         <message>
@@ -1748,5 +1772,7 @@
             <source>壁纸、图片 / 视频播放与桌面自动化</source>
             <translation>壁纸、图片 / 视频播放与桌面自动化</translation>
         </message>
-    </context>
+        <message><source>关闭</source><translation>关闭</translation></message>
+    <message><source>重启服务</source><translation>重启服务</translation></message>
+</context>
 </TS>

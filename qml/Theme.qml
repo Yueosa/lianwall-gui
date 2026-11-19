@@ -3,7 +3,7 @@ import QtQuick
 QtObject {
     property string current: "lian"
     property string accentScheme: "iris"
-    readonly property bool isDark: current === "lian-dark"
+    readonly property bool isDark: current === "lian-dark" || (current === "system" && Qt.styleHints.colorScheme === Qt.ColorScheme.Dark)
     readonly property color accent: accentScheme === "blue" ? (isDark ? "#a5d1e9" : "#46758e") : accentScheme === "pink" ? (isDark ? "#f0b3ca" : "#a45f78") : (isDark ? "#d3b4ea" : "#79558f")
     readonly property color accentHover: Qt.lighter(accent, 1.08)
     readonly property color accentPressed: Qt.darker(accent, 1.08)

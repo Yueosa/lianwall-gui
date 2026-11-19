@@ -173,7 +173,8 @@
             <source>超时：%1 秒</source>
             <translation>Timeout: %1 seconds</translation>
         </message>
-    </context>
+        <message><source>关闭</source><translation>Close</translation></message>
+</context>
     <context>
         <name>ConfigManager</name>
         <message>
@@ -560,7 +561,10 @@
             <source>导出失败：%1</source>
             <translation>Export failed: %1</translation>
         </message>
-    </context>
+        <message><source>无法打开：%1</source><translation>Could not open: %1</translation></message>
+    <message><source>无法创建日志目录：%1</source><translation>Could not create the log directory: %1</translation></message>
+    <message><source>未找到 Hook 配置：%1</source><translation>Hook configuration not found: %1</translation></message>
+</context>
     <context>
         <name>LibraryPage</name>
         <message>
@@ -727,7 +731,9 @@
             <source>连接壁纸服务后查看媒体库。</source>
             <translation>Connect to the wallpaper service to view the library.</translation>
         </message>
-    </context>
+        <message><source>打开图片目录</source><translation>Open image directory</translation></message>
+    <message><source>打开视频目录</source><translation>Open video directory</translation></message>
+</context>
     <context>
         <name>NavBar</name>
         <message>
@@ -941,7 +947,19 @@
             <source>未降级</source>
             <translation>Not degraded</translation>
         </message>
-    </context>
+        <message><source>整卡已用 %1% · %2 / %3 MB</source><translation>GPU total usage: %1% · %2 / %3 MB</translation></message>
+    <message><source>暂无壁纸</source><translation>No wallpaper</translation></message>
+    <message><source>上一张壁纸</source><translation>Previous wallpaper</translation></message>
+    <message><source>下一张壁纸</source><translation>Next wallpaper</translation></message>
+    <message><source>恢复轮换</source><translation>Resume rotation</translation></message>
+    <message><source>轮换已关闭</source><translation>Rotation disabled</translation></message>
+    <message><source>暂停轮换</source><translation>Pause rotation</translation></message>
+    <message><source>只控制自动轮换，视频继续播放</source><translation>Controls rotation. Video keeps playing.</translation></message>
+    <message><source>显存占用</source><translation>VRAM usage</translation></message>
+    <message><source>已用</source><translation>Used</translation></message>
+    <message><source>可用</source><translation>Free</translation></message>
+    <message><source>总计</source><translation>Total</translation></message>
+</context>
     <context>
         <name>PreferencesPage</name>
         <message>
@@ -1275,7 +1293,13 @@
             <source>暂无可读取的日志。请确认服务支持日志读取接口。</source>
             <translation>No readable log entries. Check that the service supports log queries.</translation>
         </message>
-    </context>
+        <message><source>跟随系统</source><translation>Follow system</translation></message>
+    <message><source>显存读取测试</source><translation>VRAM reading test</translation></message>
+    <message><source>正在读取…</source><translation>Reading…</translation></message>
+    <message><source>尚未测试</source><translation>Ready to test</translation></message>
+    <message><source>已用 %1 / %2 MB</source><translation>%1 / %2 MB used</translation></message>
+    <message><source>只决定服务启动时的模式；播放页可切换当前会话。</source><translation>Sets the startup mode. Change the current session on the playback page.</translation></message>
+</context>
     <context>
         <name>SettingsPage</name>
         <message>
@@ -1748,5 +1772,7 @@
             <source>壁纸、图片 / 视频播放与桌面自动化</source>
             <translation>Wallpapers, image/video playback and desktop automation</translation>
         </message>
-    </context>
+        <message><source>关闭</source><translation>Close</translation></message>
+    <message><source>重启服务</source><translation>Restart service</translation></message>
+</context>
 </TS>

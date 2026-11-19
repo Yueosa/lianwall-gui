@@ -54,6 +54,7 @@ public slots:
     void toggleMainWindow();
     /// 真正退出应用（非隐藏）
     void quit();
+    void restartService();
     Q_INVOKABLE void quitGui();
     /// 切换语言
     void switchLanguage(const QString &lang);

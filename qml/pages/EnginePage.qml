@@ -30,10 +30,12 @@ Item {
             C.UiButton { text: qsTr("刷新状态"); iconName: "refresh"; enabled: DaemonState.daemonConnected; onClicked: { Frontend.refreshEngine(); Frontend.refreshOutputs() } }
         }
         ScrollView {
+                ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             id: scroll
             Layout.fillWidth: true; Layout.fillHeight: true; clip: true
             contentWidth: availableWidth
-            RowLayout {
+            ColumnLayout {
                 width: scroll.availableWidth; spacing: 14
                 ColumnLayout {
                     Layout.fillWidth: true; Layout.alignment: Qt.AlignTop; spacing: 12
@@ -134,7 +136,7 @@ Item {
                     }
                 }
                 C.UiCard {
-                    Layout.preferredWidth: Math.min(330, scroll.availableWidth * 0.38); Layout.alignment: Qt.AlignTop
+                    Layout.fillWidth: true; Layout.alignment: Qt.AlignTop
                     ColumnLayout {
                         width: parent.width; spacing: 10
                         RowLayout {

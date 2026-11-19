@@ -3,7 +3,7 @@ import ".." as App
 Rectangle {
     id: root
     default property alias body: host.data
-    property int padding: 16
+    property int padding: 20
     implicitHeight: host.childrenRect.height + 2 * padding
     color: App.Theme.surface
     radius: 12

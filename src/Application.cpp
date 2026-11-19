@@ -176,15 +176,7 @@ void Application::initSystemTray()
 
     auto *restartAction = m_trayMenu->addAction(tr("🔄 重启 Daemon"));
     restartAction->setProperty("translationSource", QByteArray("🔄 重启 Daemon"));
-    connect(restartAction, &QAction::triggered, this, [this]() {
-        qDebug() << "[Tray] Restart daemon requested";
-        if (m_daemonClient->isConnected()) {
-            m_daemonClient->restartDaemon([this](const Daemon::Response &response) {
-                if (response.type == Daemon::ResponseType::Error)
-                    emit m_daemonState->daemonError(QStringLiteral("restart"), response.asError().message, true);
-            });
-        }
-    });
+    connect(restartAction, &QAction::triggered, this, &Application::restartService);
 
     m_trayMenu->addSeparator();
 
@@ -550,3 +542,12 @@ void Application::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
     }
 }
 
+
+void Application::restartService()
+{
+    if (!m_daemonClient->isConnected()) return;
+    m_daemonClient->restartDaemon([this](const Daemon::Response &response) {
+        if (response.type == Daemon::ResponseType::Error)
+            emit m_daemonState->daemonError(QStringLiteral("restart"), response.asError().message, true);
+    });
+}

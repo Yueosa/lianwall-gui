@@ -35,7 +35,17 @@ Item {
             Text { textFormat: Text.PlainText; text: qsTr("壁纸库"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.DemiBold }
             Text { textFormat: Text.PlainText; text: qsTr("管理、筛选与查找壁纸"); color: App.Theme.textSecondary; font.pixelSize: 11 }
             Item { Layout.fillWidth: true }
-            C.UiButton { text: qsTr("打开壁纸目录"); iconName: "folder"; onClicked: ConfigManager.openCurrentWallpaperDir() }
+            C.UiButton {
+                text: ConfigManager.imageDir === ConfigManager.videoDir ? qsTr("打开壁纸目录") : qsTr("打开图片目录")
+                iconName: "folder"; enabled: ConfigManager.imageDir.length > 0
+                onClicked: ConfigManager.openDirectory(ConfigManager.imageDir)
+            }
+            C.UiButton {
+                text: qsTr("打开视频目录"); iconName: "folder"
+                visible: ConfigManager.imageDir !== ConfigManager.videoDir
+                enabled: ConfigManager.videoDir.length > 0
+                onClicked: ConfigManager.openDirectory(ConfigManager.videoDir)
+            }
             C.UiButton { iconName: "refresh"; hint: qsTr("重新扫描壁纸"); enabled: DaemonState.daemonConnected && !WallpaperModel.loading; onClicked: LianwallApp.daemonRescan() }
         }
         RowLayout {
@@ -78,8 +88,12 @@ Item {
             model: WallpaperFilterModel
             clip: true
             cellWidth: root.listMode ? width : width / Math.max(2, Math.floor(width / 235))
-            cellHeight: root.listMode ? 87 : (cellWidth - 12) * 9 / 16 + 70
-            ScrollBar.vertical: ScrollBar {}
+            readonly property int actionSize: 32
+            readonly property int footerPadding: 8
+            readonly property int footerHeight: 2 * footerPadding + titleMetrics.height + 4 + actionSize
+            FontMetrics { id: titleMetrics; font.pixelSize: 12 }
+            cellHeight: root.listMode ? Math.max(87, footerHeight + 10) : 15 + (cellWidth - 20) * 9 / 16 + footerHeight
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOff }
             delegate: Item {
                 id: entry
                 required property int index
@@ -99,12 +113,13 @@ Item {
                     border.width: entry.wallpaperIsCurrent ? 2 : 1
                     Image {
                         id: art
-                        x: 1; y: 1
-                        width: root.listMode ? 122 : parent.width - 2
-                        height: root.listMode ? parent.height - 2 : width * 9 / 16
+                        x: 5; y: 5
+                        width: root.listMode ? 122 : parent.width - 10
+                        height: root.listMode ? parent.height - 10 : width * 9 / 16
                         source: "image://thumbnail/" + encodeURIComponent(entry.wallpaperPath) + "?t=" + WallpaperModel.refreshToken
-                        sourceSize: Qt.size(640, 360); asynchronous: true; cache: false
+                        sourceSize: Qt.size(640, 360); asynchronous: true; cache: true
                         fillMode: Image.PreserveAspectCrop
+
                     }
                     Rectangle {
                         x: 8; y: 8; radius: 5; height: 21; width: tag.implicitWidth + 12
@@ -113,16 +128,18 @@ Item {
                     }
                     ColumnLayout {
                         x: root.listMode ? 138 : 11
-                        y: root.listMode ? 10 : art.height + 8
+                        y: (root.listMode ? 0 : art.y + art.height) + grid.footerPadding
+                        height: parent.height - y - grid.footerPadding
+
                         width: parent.width - x - 10
                         spacing: 4
                         Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: entry.wallpaperFilename; color: App.Theme.text; font.pixelSize: 12; elide: Text.ElideMiddle }
                         RowLayout {
-                            Layout.fillWidth: true
+                            Layout.fillWidth: true; Layout.preferredHeight: grid.actionSize; spacing: 4
                             Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: entry.wallpaperLocked ? qsTr("已排除自动轮换") : entry.wallpaperIsVideo ? qsTr("视频壁纸") : qsTr("静态壁纸"); color: App.Theme.textSecondary; font.pixelSize: 10 }
-                            C.UiButton { iconName: "heart"; visible: WallpaperModel.metadataAvailable; selected: entry.wallpaperFavorite; kind: "flat"; implicitHeight: 27; hint: entry.wallpaperFavorite ? qsTr("取消收藏") : qsTr("收藏壁纸"); enabled: DaemonState.daemonConnected && WallpaperModel.pendingFavorites.indexOf(entry.wallpaperPath) < 0; onClicked: WallpaperModel.setFavorite(entry.wallpaperPath, !entry.wallpaperFavorite) }
-                            C.UiButton { iconName: "lock"; selected: entry.wallpaperLocked; kind: "flat"; implicitHeight: 27; hint: qsTr("排除 / 加入自动轮换"); enabled: DaemonState.daemonConnected; onClicked: WallpaperFilterModel.toggleLockByPath(entry.wallpaperPath) }
-                            C.UiButton { iconName: "play"; kind: "flat"; implicitHeight: 27; hint: qsTr("设为壁纸"); enabled: DaemonState.daemonConnected && !LianwallApp.wallpaperSwitching; onClicked: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
+                            C.UiButton { iconName: "heart"; visible: WallpaperModel.metadataAvailable; selected: entry.wallpaperFavorite; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: entry.wallpaperFavorite ? qsTr("取消收藏") : qsTr("收藏壁纸"); enabled: DaemonState.daemonConnected && WallpaperModel.pendingFavorites.indexOf(entry.wallpaperPath) < 0; onClicked: WallpaperModel.setFavorite(entry.wallpaperPath, !entry.wallpaperFavorite) }
+                            C.UiButton { iconName: "lock"; selected: entry.wallpaperLocked; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: qsTr("排除 / 加入自动轮换"); enabled: DaemonState.daemonConnected; onClicked: WallpaperFilterModel.toggleLockByPath(entry.wallpaperPath) }
+                            C.UiButton { iconName: "play"; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: qsTr("设为壁纸"); enabled: DaemonState.daemonConnected && !LianwallApp.wallpaperSwitching; onClicked: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
                         }
                     }
                     TapHandler { acceptedButtons: Qt.LeftButton; onDoubleTapped: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
