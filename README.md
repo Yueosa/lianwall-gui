@@ -4,7 +4,7 @@
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
 [![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
 [![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
@@ -16,7 +16,7 @@ Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态�
 > - **正在播放** — 当前壁纸、轮换控制、引擎与显存状态
 > - **壁纸库** — 搜索、时间/使用排序、收藏与缩略图
 > - **引擎与自动化** — 内置/外部引擎配置、运行诊断与真实Hook规则
-> - **设置** — 主题与语言、显存测试、服务日志查看/导出
+> - **设置** — 主题与语言、显存测试、打开服务日志目录
 > - **系统托盘** — 后台驻留，关闭窗口 ≠ 退出
 > - **中/英双语** — 运行时切换，即时生效
 
@@ -26,13 +26,13 @@ Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态�
 
 ## 2.0 界面
 
-2.0.0采用重写后的桌面界面，配套lianwalld6.0.0。下方标注旧版的截图仅供历史参考。原生Qt Quick界面采用顶部“正在播放 / 壁纸库 / 引擎 / 自动化 / 设置”五页、持续显示的轮换控制栏和浅深主题。新图标来自仓库根目录提供的PNG原图。默认窗口1280×720，合成器平铺规则可改变实际尺寸；首页预览保持横屏比例，轮换间隔统一在设置页调整。
+GUI 配套 lianwalld 6.0.0。顶部导航包含正在播放、壁纸库、引擎、自动化和设置。默认窗口为 1080 × 640，尺寸可随合成器调整。首页集中显示预览、轮换操作和整卡显存读数。下方旧版截图仅供历史参考。
 
 壁纸库支持同时浏览图片/视频、名称或目录搜索、修改时间排序，以及新daemon提供的收藏、首次发现/最近使用/成功切换次数/驻留时长排序。收藏与排除轮换相互独立；收藏必须收到保存回执后才更新，失败保留原值。资料由daemon保存到XDG数据目录，清理GUI缩略图不会丢失。文件移动/重命名视为新条目，不自动迁移原资料；统计从启用后开始，驻留时长并非观看时长。
 
 旧daemon缺少`GetLibrary`时仍可浏览/控制壁纸，收藏与统计功能不可用并显示原因。引擎页区分配置偏好与实际后端/解码器、准备状态、回退和错误；Hook页读取真实规则、重载和打开配置。设置输入支持Enter提交、Esc取消和保存错误提示。
 
-显存测试已接入真实API，可测试未保存命令并查看读数、输出和错误；测试不改变保存配置或监控状态。日志页支持最近服务日志、按最低级别筛选、打开日志目录和导出当前记录，显示实际过滤器及`RUST_LOG`覆盖。daemon文件日志按2MiB轮转，界面最多显示128条；不收集GUI自身Qt日志。导出为用户选择路径的UTF-8文件，权限0600，保存失败保留目标原文件。
+显存测试已接入真实API，可测试未保存命令并查看读数、输出和错误；测试不改变保存配置或监控状态。日志设置提供打开目录入口，命令行可通过 `lianwall logs` 读取最近记录。
 
 已补齐外部引擎参数、mpv IPC路径、内置过渡帧率、启动模式和算法参数。参数编辑器一行对应一个argv元素，空格、引号、空参数和中文按原样保存，不使用shell拆词。图片外部动画通过awww参数配置；外部mpvpaper淡入时长固定0.4秒，内置动画才使用时长与帧率选项。启动模式不直接切换当前会话。
 
@@ -234,6 +234,6 @@ lianwall-gui --socket /run/user/1000/lianwall.sock
 设置查询会合并并丢弃被新事件淘汰的旧快照，断线后重置加载状态；销毁配置对象不会接收迟到回调。
 通信请求每帧最多 1 MiB，超过时本地拒绝；响应每帧最多 64 MiB，超过时断线重同步。
 
-本版GUI2.0.0请配套daemon/CLI6.0.0，旧配置键按既有规则迁移。主要维护作者本机Linux/Hyprland，其他桌面环境未经完整验证；内置引擎支持范围与系统库要求见daemon6.0.0发行说明。
+本版GUI2.0.1请配套daemon/CLI6.0.0，旧配置键按既有规则迁移。主要维护作者本机Linux/Hyprland，其他桌面环境未经完整验证；内置引擎支持范围与系统库要求见daemon6.0.0发行说明。
 
 开发或便携运行时可用`lianwall-gui --show --daemon-executable /absolute/path/to/lianwalld`固定自动启动及菜单重启所使用的daemon；也支持`LIANWALL_DAEMON_EXECUTABLE`环境变量。指定路径无效时失败，不静默回退到系统旧版本。此选项不替换已经运行的服务，升级预览前需先停止旧服务。SIGTERM/SIGINT仅退出GUI，壁纸服务继续运行；菜单“退出GUI与服务”才显式停止两者。
