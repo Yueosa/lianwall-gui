@@ -4,7 +4,7 @@
 
 Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态壁纸管理器的控制面板
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
+[![Version](https://img.shields.io/badge/version-2.0.2-blue.svg)](https://github.com/Yueosa/lianwall-gui/releases)
 [![License](https://img.shields.io/badge/license-LianWall-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Wayland-blueviolet.svg)](https://wayland.freedesktop.org/)
 [![Qt](https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt)](https://www.qt.io/)
@@ -26,7 +26,7 @@ Qt6/QML 图形前端 — [lianwall](https://github.com/Yueosa/lianwall) 动态�
 
 ## 2.0 界面
 
-GUI 配套 lianwalld 6.0.0。顶部导航包含正在播放、壁纸库、引擎、自动化和设置。默认窗口为 1080 × 640，尺寸可随合成器调整。首页集中显示预览、轮换操作和整卡显存读数。下方旧版截图仅供历史参考。
+GUI 配套 lianwalld 6.0.1。顶部导航包含正在播放、壁纸库、引擎、自动化和设置。默认窗口为 1080 × 640，尺寸可随合成器调整。首页集中显示预览、轮换操作和整卡显存读数。下方旧版截图仅供历史参考。
 
 壁纸库支持同时浏览图片/视频、名称或目录搜索、修改时间排序，以及新daemon提供的收藏、首次发现/最近使用/成功切换次数/驻留时长排序。收藏与排除轮换相互独立；收藏必须收到保存回执后才更新，失败保留原值。资料由daemon保存到XDG数据目录，清理GUI缩略图不会丢失。文件移动/重命名视为新条目，不自动迁移原资料；统计从启用后开始，驻留时长并非观看时长。
 
@@ -234,6 +234,6 @@ lianwall-gui --socket /run/user/1000/lianwall.sock
 设置查询会合并并丢弃被新事件淘汰的旧快照，断线后重置加载状态；销毁配置对象不会接收迟到回调。
 通信请求每帧最多 1 MiB，超过时本地拒绝；响应每帧最多 64 MiB，超过时断线重同步。
 
-本版GUI2.0.1请配套daemon/CLI6.0.0，旧配置键按既有规则迁移。主要维护作者本机Linux/Hyprland，其他桌面环境未经完整验证；内置引擎支持范围与系统库要求见daemon6.0.0发行说明。
+本版GUI2.0.2请配套daemon/CLI6.0.1，旧配置键按既有规则迁移。主要维护作者本机Linux/Hyprland，其他桌面环境未经完整验证；内置引擎支持范围与系统库要求见daemon6.0.1发行说明。
 
 开发或便携运行时可用`lianwall-gui --show --daemon-executable /absolute/path/to/lianwalld`固定自动启动及菜单重启所使用的daemon；也支持`LIANWALL_DAEMON_EXECUTABLE`环境变量。指定路径无效时失败，不静默回退到系统旧版本。此选项不替换已经运行的服务，升级预览前需先停止旧服务。SIGTERM/SIGINT仅退出GUI，壁纸服务继续运行；菜单“退出GUI与服务”才显式停止两者。
