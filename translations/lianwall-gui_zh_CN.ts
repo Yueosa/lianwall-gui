@@ -733,6 +733,7 @@
         </message>
         <message><source>打开图片目录</source><translation>打开图片目录</translation></message>
     <message><source>打开视频目录</source><translation>打开视频目录</translation></message>
+    <message><source>时段外</source><translation>时段外</translation></message>
 </context>
     <context>
         <name>NavBar</name>

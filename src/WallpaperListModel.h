@@ -52,6 +52,7 @@ public:
         IsCurrentRole,
         IndexRole,
         FavoriteRole, PlayCountRole, DisplaySecondsRole, AddedAtRole, LastUsedRole,
+        OutsideScheduleRole, TimeConstraintsRole,
         ModifiedRole,
         IsVideoRole,          // 根据文件扩展名判断
     };
@@ -133,6 +134,8 @@ private:
     bool m_reloadPending = false;
     quint64 m_loadGeneration = 0;
     quint64 m_contentRevision = 0;
+    void syncScheduledRows();
+    int m_spaceCount = 0;
     QVector<Daemon::WallpaperPoint> m_items;
     QHash<QString, qint64> m_modifiedTimes;
     QString m_activePath;

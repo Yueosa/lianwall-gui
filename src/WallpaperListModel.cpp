@@ -87,6 +87,8 @@ QVariant WallpaperListModel::data(const QModelIndex &index, int role) const
     case DisplaySecondsRole: return m_metadata.value(item.path).value("display_seconds", 0);
     case AddedAtRole: return m_metadata.value(item.path).value("added_at", 0);
     case LastUsedRole: return m_metadata.value(item.path).value("last_used", 0);
+    case OutsideScheduleRole: return index.row() >= m_spaceCount;
+    case TimeConstraintsRole: return item.timeConstraints;
     case ModifiedRole:   return m_modifiedTimes.value(item.path);
     case IsVideoRole:     return isVideoFile(item.filename);
     }
@@ -105,6 +107,8 @@ QHash<int, QByteArray> WallpaperListModel::roleNames() const
         { IndexRole,      "wallpaperIndex" },
         { FavoriteRole, "wallpaperFavorite" }, { PlayCountRole, "wallpaperPlayCount" },
         { DisplaySecondsRole, "wallpaperDisplaySeconds" }, { AddedAtRole, "wallpaperAddedAt" }, { LastUsedRole, "wallpaperLastUsed" },
+        { OutsideScheduleRole, "wallpaperOutsideSchedule" },
+        { TimeConstraintsRole, "wallpaperTimeConstraints" },
         { ModifiedRole, "wallpaperModified" },
         { IsVideoRole,    "wallpaperIsVideo" },
     };
@@ -148,8 +152,10 @@ void WallpaperListModel::load(const QString &mode)
                 paths.insert(item.path); guard->m_items.append(item);
                 guard->m_modifiedTimes.insert(item.path, QFileInfo(item.path).lastModified().toMSecsSinceEpoch());
             }
+            guard->m_spaceCount = guard->m_items.size();
             guard->m_mode = result->mode;
             guard->endResetModel();
+            guard->syncScheduledRows();
             ++guard->m_refreshToken; emit guard->refreshTokenChanged();
             emit guard->modeChanged(); emit guard->countChanged();
         } else if (!result->error.isEmpty()) emit guard->errorOccurred(result->error);
@@ -164,6 +170,45 @@ void WallpaperListModel::load(const QString &mode)
     } else {
         m_client->getSpace(mode.isEmpty() ? std::nullopt : std::optional<Daemon::WallMode>(Daemon::wallModeFromString(mode)), received);
     }
+}
+
+void WallpaperListModel::syncScheduledRows()
+{
+    QSet<QString> active;
+    for (int i = 0; i < m_spaceCount; ++i)
+        active.insert(m_items[i].path);
+
+    QVector<Daemon::WallpaperPoint> scheduled;
+    for (auto it = m_metadata.cbegin(); it != m_metadata.cend(); ++it) {
+        const auto ranges = it.value().value("scanned_time_constraints").toStringList();
+        if (ranges.isEmpty() || active.contains(it.key())) continue;
+        Daemon::WallpaperPoint point;
+        point.path = it.key();
+        point.filename = QFileInfo(point.path).fileName();
+        if (m_mode != "All" && (m_mode == "Video") != isVideoFile(point.filename)) continue;
+        point.timeConstraints = ranges;
+        scheduled.append(point);
+    }
+    bool unchanged = m_items.size() == m_spaceCount + scheduled.size();
+    for (int i = 0; unchanged && i < scheduled.size(); ++i) {
+        const auto &old = m_items[m_spaceCount + i];
+        unchanged = old.path == scheduled[i].path && old.timeConstraints == scheduled[i].timeConstraints;
+    }
+    if (unchanged) return;
+    if (m_items.size() > m_spaceCount) {
+        beginRemoveRows({}, m_spaceCount, m_items.size() - 1);
+        while (m_items.size() > m_spaceCount)
+            m_modifiedTimes.remove(m_items.takeLast().path);
+        endRemoveRows();
+    }
+    if (!scheduled.isEmpty()) {
+        beginInsertRows({}, m_spaceCount, m_spaceCount + scheduled.size() - 1);
+        for (const auto &point : scheduled)
+            m_modifiedTimes.insert(point.path, QFileInfo(point.path).lastModified().toMSecsSinceEpoch());
+        m_items += scheduled;
+        endInsertRows();
+    }
+    emit countChanged();
 }
 
 void WallpaperListModel::refreshMetadata()
@@ -220,6 +265,7 @@ void WallpaperListModel::metadataPage(int offset, quint64 generation)
         guard->m_metadata = std::move(guard->m_metadataBuffer);
         guard->m_metadataUnsupported = false;
         guard->m_metadataAvailable = true;
+        guard->syncScheduledRows();
         guard->m_metadataError = payload.value("persistence_error").toString();
         finish();
     });
@@ -244,7 +290,7 @@ void WallpaperListModel::setFavorite(const QString &path, bool favorite)
 
 void WallpaperListModel::toggleLock(int row)
 {
-    if (row < 0 || row >= m_items.size())
+    if (row < 0 || row >= m_spaceCount)
         return;
 
     const auto path = m_items.at(row).path;
@@ -277,7 +323,7 @@ void WallpaperListModel::toggleLock(int row)
 
 void WallpaperListModel::setAsCurrent(int row)
 {
-    if (row < 0 || row >= m_items.size())
+    if (row < 0 || row >= m_spaceCount)
         return;
     m_wallpaperController->setWallpaper(m_items.at(row).path);
 }

@@ -267,6 +267,8 @@ struct WallpaperPoint {
     bool inCooldown = false;
     bool isCurrent = false;
 
+    QStringList timeConstraints;
+
     static WallpaperPoint fromJson(const QJsonObject &obj) {
         return {
             obj[QLatin1String("index")].toInt(),
@@ -276,6 +278,7 @@ struct WallpaperPoint {
             obj[QLatin1String("locked")].toBool(),
             obj[QLatin1String("in_cooldown")].toBool(),
             obj[QLatin1String("is_current")].toBool(),
+            obj[QLatin1String("time_constraints")].toVariant().toStringList(),
         };
     }
 };
