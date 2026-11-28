@@ -142,14 +142,14 @@ Item {
                             Text { textFormat: Text.PlainText; Layout.fillWidth: true; elide: Text.ElideRight; Layout.minimumWidth: 0; text: entry.wallpaperOutsideSchedule ? qsTr("时段外") + " · " + entry.schedule : entry.schedule || (entry.wallpaperLocked ? qsTr("已排除自动轮换") : entry.wallpaperIsVideo ? qsTr("视频壁纸") : qsTr("静态壁纸")); color: App.Theme.textSecondary; font.pixelSize: 10 }
                             C.UiButton { iconName: "heart"; visible: WallpaperModel.metadataAvailable; selected: entry.wallpaperFavorite; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: entry.wallpaperFavorite ? qsTr("取消收藏") : qsTr("收藏壁纸"); enabled: DaemonState.daemonConnected && WallpaperModel.pendingFavorites.indexOf(entry.wallpaperPath) < 0; onClicked: WallpaperModel.setFavorite(entry.wallpaperPath, !entry.wallpaperFavorite) }
                             C.UiButton { iconName: "lock"; selected: entry.wallpaperLocked; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: qsTr("排除 / 加入自动轮换"); enabled: DaemonState.daemonConnected && !entry.wallpaperOutsideSchedule; onClicked: WallpaperFilterModel.toggleLockByPath(entry.wallpaperPath) }
-                            C.UiButton { iconName: "play"; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: qsTr("设为壁纸"); enabled: DaemonState.daemonConnected && !entry.wallpaperOutsideSchedule && !LianwallApp.wallpaperSwitching; onClicked: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
+                            C.UiButton { iconName: "play"; kind: "flat"; padding: (grid.actionSize - 17) / 2; implicitWidth: grid.actionSize; implicitHeight: grid.actionSize; hint: qsTr("设为壁纸"); enabled: DaemonState.daemonConnected && !LianwallApp.wallpaperSwitching; onClicked: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
                         }
                     }
-                    TapHandler { enabled: !entry.wallpaperOutsideSchedule; acceptedButtons: Qt.LeftButton; onDoubleTapped: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
+                    TapHandler { enabled: DaemonState.daemonConnected && !LianwallApp.wallpaperSwitching; acceptedButtons: Qt.LeftButton; onDoubleTapped: WallpaperFilterModel.setAsCurrentByPath(entry.wallpaperPath) }
                     HoverHandler { id: hover }
                     C.UiToolTip {
                     visible: hover.hovered
-                    text: entry.wallpaperPath + (entry.schedule ? "\n" + entry.schedule : "") + "\n" + (entry.wallpaperOutsideSchedule ? qsTr("时段外") : qsTr("双击设为壁纸")) + (WallpaperModel.metadataAvailable ? "\n" + qsTr("成功切换 %1 次 · 驻留 %2 分钟").arg(entry.wallpaperPlayCount).arg(Math.floor(entry.wallpaperDisplaySeconds / 60)) : "")
+                    text: entry.wallpaperPath + (entry.schedule ? "\n" + entry.schedule : "") + "\n" + qsTr("双击设为壁纸") + (WallpaperModel.metadataAvailable ? "\n" + qsTr("成功切换 %1 次 · 驻留 %2 分钟").arg(entry.wallpaperPlayCount).arg(Math.floor(entry.wallpaperDisplaySeconds / 60)) : "")
                     delay: 900
                     }
                 }

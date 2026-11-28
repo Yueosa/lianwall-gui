@@ -323,7 +323,7 @@ void WallpaperListModel::toggleLock(int row)
 
 void WallpaperListModel::setAsCurrent(int row)
 {
-    if (row < 0 || row >= m_spaceCount)
+    if (row < 0 || row >= m_items.size())
         return;
     m_wallpaperController->setWallpaper(m_items.at(row).path);
 }
